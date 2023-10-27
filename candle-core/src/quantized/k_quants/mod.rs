@@ -138,6 +138,7 @@ impl GgmlType for BlockQ4_0 {
     const DTYPE: GgmlDType = GgmlDType::Q4_0;
     const BLCK_SIZE: usize = QK4_0;
     type VecDotType = BlockQ8_0;
+    const SUPPORTS_I8MM: bool = true;
 
     // https://github.com/ggerganov/llama.cpp/blob/468ea24fb4633a0d681f7ac84089566c1c6190cb/ggml.c#L1525
     fn to_float(xs: &[Self], ys: &mut [f32]) -> Result<()> {
@@ -232,12 +233,28 @@ impl GgmlType for BlockQ4_0 {
         }
         Ok(sumf)
     }
+
+    #[allow(unreachable_code)]
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        n: usize,
+        xs_0: &[Self],
+        xs_1: &[Self],
+        ys_0: &[Self::VecDotType],
+        ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        #[cfg(target_feature = "neon")]
+        return super::neon::i8mm_q4_0_q8_0(n, xs_0, xs_1, ys_0, ys_1);
+
+        crate::bail!("Unsupported block type for i8mm");
+    }
 }
 
 impl GgmlType for BlockQ4_1 {
     const DTYPE: GgmlDType = GgmlDType::Q4_1;
     const BLCK_SIZE: usize = QK4_1;
     type VecDotType = BlockQ8_1;
+    const SUPPORTS_I8MM: bool = false;
 
     fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
         Self::vec_dot_unopt(n, xs, ys)
@@ -327,12 +344,26 @@ impl GgmlType for BlockQ4_1 {
         }
         Ok(())
     }
+
+    #[allow(unreachable_code)]
+    #[allow(unused)]
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        n: usize,
+        xs_0: &[Self],
+        xs_1: &[Self],
+        ys_0: &[Self::VecDotType],
+        ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        crate::bail!("Unsupported block type for i8mm");
+    }
 }
 
 impl GgmlType for BlockQ5_0 {
     const DTYPE: GgmlDType = GgmlDType::Q5_0;
     const BLCK_SIZE: usize = QK5_0;
     type VecDotType = BlockQ8_0;
+    const SUPPORTS_I8MM: bool = false;
 
     fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
         let qk = Self::BLCK_SIZE;
@@ -429,12 +460,25 @@ impl GgmlType for BlockQ5_0 {
         }
         Ok(())
     }
+
+    #[allow(unused)]
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        n: usize,
+        xs_0: &[Self],
+        xs_1: &[Self],
+        ys_0: &[Self::VecDotType],
+        ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        crate::bail!("Unsupported block type for i8mm");
+    }
 }
 
 impl GgmlType for BlockQ5_1 {
     const DTYPE: GgmlDType = GgmlDType::Q5_1;
     const BLCK_SIZE: usize = QK5_1;
     type VecDotType = BlockQ8_1;
+    const SUPPORTS_I8MM: bool = false;
 
     fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
         Self::vec_dot_unopt(n, xs, ys)
@@ -537,12 +581,25 @@ impl GgmlType for BlockQ5_1 {
         }
         Ok(())
     }
+
+    #[allow(unused)]
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        n: usize,
+        xs_0: &[Self],
+        xs_1: &[Self],
+        ys_0: &[Self::VecDotType],
+        ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        crate::bail!("Unsupported block type for i8mm");
+    }
 }
 
 impl GgmlType for BlockQ8_0 {
     const DTYPE: GgmlDType = GgmlDType::Q8_0;
     const BLCK_SIZE: usize = QK8_0;
     type VecDotType = BlockQ8_0;
+    const SUPPORTS_I8MM: bool = true;
 
     // https://github.com/ggerganov/llama.cpp/blob/468ea24fb4633a0d681f7ac84089566c1c6190cb/ggml.c#L1619
     fn to_float(xs: &[Self], ys: &mut [f32]) -> Result<()> {
@@ -627,12 +684,29 @@ impl GgmlType for BlockQ8_0 {
         }
         Ok(sumf)
     }
+
+    #[allow(unreachable_code)]
+    #[allow(unused)]
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        n: usize,
+        xs_0: &[Self],
+        xs_1: &[Self],
+        ys_0: &[Self::VecDotType],
+        ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        #[cfg(target_feature = "neon")]
+        return super::neon::i8mm_q8_0_q8_0(n, xs_0, xs_1, ys_0, ys_1);
+
+        crate::bail!("Unsupported block type for i8mm");
+    }
 }
 
 impl GgmlType for BlockQ8_1 {
     const DTYPE: GgmlDType = GgmlDType::Q8_1;
     const BLCK_SIZE: usize = QK8_1;
     type VecDotType = BlockQ8_1;
+    const SUPPORTS_I8MM: bool = false;
 
     fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
         Self::vec_dot_unopt(n, xs, ys)
@@ -673,12 +747,23 @@ impl GgmlType for BlockQ8_1 {
     fn to_float(_xs: &[Self], _ys: &mut [f32]) -> Result<()> {
         unimplemented!("no support for vec-dot on Q8_1")
     }
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        _n: usize,
+        _xs_0: &[Self],
+        _xs_1: &[Self],
+        _ys_0: &[Self::VecDotType],
+        _ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        unimplemented!("no support for i8mm matmul on Q8_1")
+    }
 }
 
 impl GgmlType for BlockQ2K {
     const DTYPE: GgmlDType = GgmlDType::Q2K;
     const BLCK_SIZE: usize = QK_K;
     type VecDotType = BlockQ8K;
+    const SUPPORTS_I8MM: bool = true;
 
     #[allow(unreachable_code)]
     fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
@@ -915,12 +1000,28 @@ impl GgmlType for BlockQ2K {
         }
         Ok(())
     }
+
+    #[allow(unreachable_code)]
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        n: usize,
+        xs_0: &[Self],
+        xs_1: &[Self],
+        ys_0: &[Self::VecDotType],
+        ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        #[cfg(target_feature = "neon")]
+        return super::neon::i8mm_q2k_q8k(n, xs_0, xs_1, ys_0, ys_1);
+
+        crate::bail!("Unsupported block type for i8mm");
+    }
 }
 
 impl GgmlType for BlockQ3K {
     const DTYPE: GgmlDType = GgmlDType::Q3K;
     const BLCK_SIZE: usize = QK_K;
     type VecDotType = BlockQ8K;
+    const SUPPORTS_I8MM: bool = false;
 
     #[allow(unreachable_code)]
     fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
@@ -1297,12 +1398,29 @@ impl GgmlType for BlockQ3K {
 
         Ok(())
     }
+
+    #[allow(unreachable_code)]
+    #[allow(unused)]
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        n: usize,
+        xs_0: &[Self],
+        xs_1: &[Self],
+        ys_0: &[Self::VecDotType],
+        ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        #[cfg(target_feature = "neon")]
+        return super::neon::i8mm_q3k_q8k(n, xs_0, xs_1, ys_0, ys_1);
+
+        crate::bail!("Unsupported block type for i8mm");
+    }
 }
 
 impl GgmlType for BlockQ4K {
     const DTYPE: GgmlDType = GgmlDType::Q4K;
     const BLCK_SIZE: usize = QK_K;
     type VecDotType = BlockQ8K;
+    const SUPPORTS_I8MM: bool = true;
 
     #[allow(unreachable_code)]
     fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
@@ -1562,6 +1680,22 @@ impl GgmlType for BlockQ4K {
         }
         Ok(())
     }
+
+    #[allow(unreachable_code)]
+    #[allow(dead_code)]
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        n: usize,
+        xs_0: &[Self],
+        xs_1: &[Self],
+        ys_0: &[Self::VecDotType],
+        ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        #[cfg(target_feature = "neon")]
+        return super::neon::i8mm_q4k_q8k(n, xs_0, xs_1, ys_0, ys_1);
+
+        crate::bail!("Unsupported block type for i8mm");
+    }
 }
 
 // https://github.com/ggerganov/llama.cpp/blob/8183159cf3def112f6d1fe94815fce70e1bffa12/k_quants.c#L928
@@ -1569,6 +1703,7 @@ impl GgmlType for BlockQ5K {
     const DTYPE: GgmlDType = GgmlDType::Q5K;
     const BLCK_SIZE: usize = QK_K;
     type VecDotType = BlockQ8K;
+    const SUPPORTS_I8MM: bool = true;
 
     #[allow(unreachable_code)]
     fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
@@ -1873,12 +2008,29 @@ impl GgmlType for BlockQ5K {
         }
         Ok(())
     }
+
+    #[allow(unreachable_code)]
+    #[allow(unused)]
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        n: usize,
+        xs_0: &[Self],
+        xs_1: &[Self],
+        ys_0: &[Self::VecDotType],
+        ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        #[cfg(target_feature = "neon")]
+        return super::neon::i8mm_q5k_q8k(n, xs_0, xs_1, ys_0, ys_1);
+
+        crate::bail!("Unsupported block type for i8mm");
+    }
 }
 
 impl GgmlType for BlockQ6K {
     const DTYPE: GgmlDType = GgmlDType::Q6K;
     const BLCK_SIZE: usize = QK_K;
     type VecDotType = BlockQ8K;
+    const SUPPORTS_I8MM: bool = true;
 
     #[allow(unreachable_code)]
     fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
@@ -2143,12 +2295,29 @@ impl GgmlType for BlockQ6K {
         }
         Ok(())
     }
+
+    #[allow(unreachable_code)]
+    #[allow(unused)]
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        n: usize,
+        xs_0: &[Self],
+        xs_1: &[Self],
+        ys_0: &[Self::VecDotType],
+        ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        #[cfg(target_feature = "neon")]
+        return super::neon::i8mm_q6k_q8k(n, xs_0, xs_1, ys_0, ys_1);
+
+        crate::bail!("Unsupported block type for i8mm");
+    }
 }
 
 impl GgmlType for BlockQ8K {
     const DTYPE: GgmlDType = GgmlDType::Q8K;
     const BLCK_SIZE: usize = QK_K;
     type VecDotType = BlockQ8K;
+    const SUPPORTS_I8MM: bool = false;
 
     #[allow(unreachable_code)]
     fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
@@ -2234,5 +2403,15 @@ impl GgmlType for BlockQ8K {
             }
         }
         Ok(())
+    }
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        _n: usize,
+        _xs_0: &[Self],
+        _xs_1: &[Self],
+        _ys_0: &[Self::VecDotType],
+        _ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        unreachable!();
     }
 }

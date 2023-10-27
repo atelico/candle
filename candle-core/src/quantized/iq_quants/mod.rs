@@ -32,6 +32,7 @@ impl GgmlType for BlockIQ4xs {
     const DTYPE: GgmlDType = GgmlDType::Iq4Xs;
     const BLCK_SIZE: usize = QK_K;
     type VecDotType = BlockQ8K;
+    const SUPPORTS_I8MM: bool = false;
 
     fn to_float(xs: &[Self], mut ys: &mut [f32]) -> Result<()> {
         let k = ys.len();
@@ -176,6 +177,18 @@ impl GgmlType for BlockIQ4xs {
         }
 
         Ok(sumf)
+    }
+
+    #[allow(unused)]
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        n: usize,
+        xs_0: &[Self],
+        xs_1: &[Self],
+        ys_0: &[Self::VecDotType],
+        ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        crate::bail!("Unsupported block type for i8mm");
     }
 }
 
