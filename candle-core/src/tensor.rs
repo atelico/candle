@@ -1199,6 +1199,62 @@ impl Tensor {
             (batching, m, n, k),
             self.layout(),
             rhs.layout(),
+            None,
+        )?;
+        let op = BackpropOp::new2(self, rhs, Op::Matmul);
+        Ok(from_storage(storage, c_shape, op, false))
+    }
+
+    /// Returns the matrix-multiplication of the input tensor with the other provided tensor.
+    /// The result is multiplied by the provided scalar `alpha`.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - A tensor with dimensions `b1, b2, ..., bi, m, k`.
+    /// * `rhs` - A tensor with dimensions `b1, b2, ..., bi, k, n`.
+    ///
+    /// The resulting tensor has dimensions `b1, b2, ..., bi, m, n`.
+    pub fn matmul_affine_fused(&self, rhs: &Self, alpha: f64) -> Result<Self> {
+        let a_dims = self.shape().dims();
+        let b_dims = rhs.shape().dims();
+
+        let dim = a_dims.len();
+
+        if dim < 2 || b_dims.len() != dim {
+            Err(Error::ShapeMismatchBinaryOp {
+                lhs: self.shape().clone(),
+                rhs: rhs.shape().clone(),
+                op: "matmul",
+            }
+            .bt())?
+        }
+
+        let m = a_dims[dim - 2];
+        let k = a_dims[dim - 1];
+        let k2 = b_dims[dim - 2];
+        let n = b_dims[dim - 1];
+
+        let c_shape = Shape::from(&a_dims[..dim - 2]).extend(&[m, n]);
+        if c_shape.elem_count() == 0 || k == 0 {
+            return Tensor::zeros(c_shape, self.dtype(), self.device());
+        }
+        let batching: usize = a_dims[..dim - 2].iter().product();
+        let batching_b: usize = b_dims[..dim - 2].iter().product();
+        if k != k2 || batching != batching_b {
+            Err(Error::ShapeMismatchBinaryOp {
+                lhs: self.shape().clone(),
+                rhs: rhs.shape().clone(),
+                op: "matmul",
+            }
+            .bt())?
+        }
+
+        let storage = self.storage().matmul(
+            &rhs.storage(),
+            (batching, m, n, k),
+            self.layout(),
+            rhs.layout(),
+            Some(alpha),
         )?;
         let op = BackpropOp::new2(self, rhs, Op::Matmul);
         Ok(from_storage(storage, c_shape, op, false))

@@ -1,3 +1,5 @@
+use half::{bf16, f16};
+
 /// Helper functions to write CPU kernels.
 use crate::backend::BackendStorage;
 use crate::{Error, Layout, Result, WithDType};
@@ -48,6 +50,51 @@ pub trait Map2 {
             (C::F16(v1), C::F16(v2)) => Ok(C::F16(self.f(v1, l1, v2, l2)?)),
             (C::F32(v1), C::F32(v2)) => Ok(C::F32(self.f(v1, l1, v2, l2)?)),
             (C::F64(v1), C::F64(v2)) => Ok(C::F64(self.f(v1, l1, v2, l2)?)),
+            _ => Err(Error::DTypeMismatchBinaryOp {
+                lhs: v1.dtype(),
+                rhs: v2.dtype(),
+                op: Self::OP,
+            }
+            .bt()),
+        }
+    }
+}
+
+pub trait Map2Affine {
+    const OP: &'static str;
+    fn f<T: WithDType>(
+        &self,
+        v1: &[T],
+        l1: &Layout,
+        v2: &[T],
+        l2: &Layout,
+        alpha: Option<T>,
+    ) -> Result<Vec<T>>;
+
+    /// Integral types have `alpha` automatically set to None (1)
+    fn map(&self, v1: &C, l1: &Layout, v2: &C, l2: &Layout, alpha: Option<f64>) -> Result<C> {
+        match (v1, v2) {
+            (C::U8(v1), C::U8(v2)) => Ok(C::U8(self.f(v1, l1, v2, l2, None)?)),
+            (C::U32(v1), C::U32(v2)) => Ok(C::U32(self.f(v1, l1, v2, l2, None)?)),
+            (C::I64(v1), C::I64(v2)) => Ok(C::I64(self.f(v1, l1, v2, l2, None)?)),
+            (C::BF16(v1), C::BF16(v2)) => Ok(C::BF16(self.f(
+                v1,
+                l1,
+                v2,
+                l2,
+                alpha.map(|x| bf16::from_f64_const(x)),
+            )?)),
+            (C::F16(v1), C::F16(v2)) => Ok(C::F16(self.f(
+                v1,
+                l1,
+                v2,
+                l2,
+                alpha.map(|x| f16::from_f64_const(x)),
+            )?)),
+            (C::F32(v1), C::F32(v2)) => {
+                Ok(C::F32(self.f(v1, l1, v2, l2, alpha.map(|x| x as f32))?))
+            }
+            (C::F64(v1), C::F64(v2)) => Ok(C::F64(self.f(v1, l1, v2, l2, alpha)?)),
             _ => Err(Error::DTypeMismatchBinaryOp {
                 lhs: v1.dtype(),
                 rhs: v2.dtype(),

@@ -158,6 +158,7 @@ impl crate::backend::BackendStorage for MetalStorage {
         _: (usize, usize, usize, usize),
         _: &Layout,
         _: &Layout,
+        _: Option<f64>,
     ) -> Result<Self> {
         Err(Error::NotCompiledWithMetalSupport)
     }
