@@ -9,6 +9,8 @@ pub use utils::{
     binary_map, binary_map_vec, unary_map, unary_map_vec, Map1, Map1Any, Map2, Map2U8,
 };
 
+use self::utils::Map2Affine;
+
 const USE_IM2COL_CONV1D: bool = true;
 const USE_IM2COL_CONV1D_TR: bool = true;
 const USE_IM2COL_CONV2D: bool = true;
@@ -1241,7 +1243,7 @@ impl MatMul {
     }
 }
 
-impl Map2 for MatMul {
+impl Map2Affine for MatMul {
     const OP: &'static str = "mat_mul";
 
     #[cfg(all(not(feature = "mkl"), not(feature = "accelerate")))]
@@ -1251,6 +1253,7 @@ impl Map2 for MatMul {
         lhs_l: &Layout,
         rhs: &[T],
         rhs_l: &Layout,
+        alpha: Option<T>,
     ) -> Result<Vec<T>> {
         use gemm::{gemm, Parallelism};
 
@@ -1307,7 +1310,7 @@ impl Map2 for MatMul {
                     /* rhs_cs: isize = */ rhs_cs as isize,
                     /* rhs_rs: isize = */ rhs_rs as isize,
                     /* alpha: T = */ T::zero(),
-                    /* beta: T = */ T::one(),
+                    /* beta: T = */ alpha.unwrap_or(T::one()),
                     /* conj_dst: bool = */ false,
                     /* conj_lhs: bool = */ false,
                     /* conj_rhs: bool = */ false,
@@ -1325,6 +1328,7 @@ impl Map2 for MatMul {
         lhs_l: &Layout,
         rhs: &[T],
         rhs_l: &Layout,
+        alpha: Option<T>,
     ) -> Result<Vec<T>> {
         let (b, m, n, k) = self.0;
         let lhs = &lhs[lhs_l.start_offset()..];
@@ -1375,10 +1379,19 @@ impl Map2 for MatMul {
                         let b = std::slice::from_raw_parts(b, b_skip);
                         let c = std::slice::from_raw_parts_mut(c, c_skip);
                         crate::accelerate::sgemm(
-                            transa, transb, /* m= */ n as i32, /* n= */ m as i32,
-                            /* k= */ k as i32, /* alpha= */ 1., /* a= */ a,
-                            /* lda= */ lda, /* b= */ b, /* ldb= */ ldb,
-                            /* beta= */ 0., /* c= */ c, /* ldc= */ n as i32,
+                            transa,
+                            transb,
+                            /* m= */ n as i32,
+                            /* n= */ m as i32,
+                            /* k= */ k as i32,
+                            /* alpha= */ alpha.unwrap_or(T::one()).to_f64() as f32,
+                            /* a= */ a,
+                            /* lda= */ lda,
+                            /* b= */ b,
+                            /* ldb= */ ldb,
+                            /* beta= */ 0.,
+                            /* c= */ c,
+                            /* ldc= */ n as i32,
                         )
                     }
                 }
@@ -1396,10 +1409,19 @@ impl Map2 for MatMul {
                         let b = std::slice::from_raw_parts(b, b_skip);
                         let c = std::slice::from_raw_parts_mut(c, c_skip);
                         crate::accelerate::dgemm(
-                            transa, transb, /* m= */ n as i32, /* n= */ m as i32,
-                            /* k= */ k as i32, /* alpha= */ 1., /* a= */ a,
-                            /* lda= */ lda, /* b= */ b, /* ldb= */ ldb,
-                            /* beta= */ 0., /* c= */ c, /* ldc= */ n as i32,
+                            transa,
+                            transb,
+                            /* m= */ n as i32,
+                            /* n= */ m as i32,
+                            /* k= */ k as i32,
+                            /* alpha= */ alpha.unwrap_or(T::one()).to_f64(),
+                            /* a= */ a,
+                            /* lda= */ lda,
+                            /* b= */ b,
+                            /* ldb= */ ldb,
+                            /* beta= */ 0.,
+                            /* c= */ c,
+                            /* ldc= */ n as i32,
                         )
                     }
                 }
@@ -1416,6 +1438,7 @@ impl Map2 for MatMul {
         lhs_l: &Layout,
         rhs: &[T],
         rhs_l: &Layout,
+        alpha: Option<T>,
     ) -> Result<Vec<T>> {
         let (b, m, n, k) = self.0;
         let lhs = &lhs[lhs_l.start_offset()..];
@@ -1468,7 +1491,7 @@ impl Map2 for MatMul {
                             /* m= */ n as i32,
                             /* n= */ m as i32,
                             /* k= */ k as i32,
-                            /* alpha= */ f16::ONE,
+                            /* alpha= */ f16::from_f64(alpha.unwrap_or(T::one()).to_f64()),
                             /* a= */ a,
                             /* lda= */ lda,
                             /* b= */ b,
@@ -1493,10 +1516,19 @@ impl Map2 for MatMul {
                         let b = std::slice::from_raw_parts(b, b_skip);
                         let c = std::slice::from_raw_parts_mut(c, c_skip);
                         crate::mkl::sgemm(
-                            transa, transb, /* m= */ n as i32, /* n= */ m as i32,
-                            /* k= */ k as i32, /* alpha= */ 1., /* a= */ a,
-                            /* lda= */ lda, /* b= */ b, /* ldb= */ ldb,
-                            /* beta= */ 0., /* c= */ c, /* ldc= */ n as i32,
+                            transa,
+                            transb,
+                            /* m= */ n as i32,
+                            /* n= */ m as i32,
+                            /* k= */ k as i32,
+                            /* alpha= */ alpha.unwrap_or(T::one()).to_f64() as f32,
+                            /* a= */ a,
+                            /* lda= */ lda,
+                            /* b= */ b,
+                            /* ldb= */ ldb,
+                            /* beta= */ 0.,
+                            /* c= */ c,
+                            /* ldc= */ n as i32,
                         )
                     }
                 }
@@ -1514,10 +1546,19 @@ impl Map2 for MatMul {
                         let b = std::slice::from_raw_parts(b, b_skip);
                         let c = std::slice::from_raw_parts_mut(c, c_skip);
                         crate::mkl::dgemm(
-                            transa, transb, /* m= */ n as i32, /* n= */ m as i32,
-                            /* k= */ k as i32, /* alpha= */ 1., /* a= */ a,
-                            /* lda= */ lda, /* b= */ b, /* ldb= */ ldb,
-                            /* beta= */ 0., /* c= */ c, /* ldc= */ n as i32,
+                            transa,
+                            transb,
+                            /* m= */ n as i32,
+                            /* n= */ m as i32,
+                            /* k= */ k as i32,
+                            /* alpha= */ alpha.unwrap_or(T::one()).to_f64(),
+                            /* a= */ a,
+                            /* lda= */ lda,
+                            /* b= */ b,
+                            /* ldb= */ ldb,
+                            /* beta= */ 0.,
+                            /* c= */ c,
+                            /* ldc= */ n as i32,
                         )
                     }
                 }
@@ -2219,7 +2260,7 @@ impl BackendStorage for CpuStorage {
             let kernel_l = Layout::contiguous_with_offset((1, n, k), kernel_l.start_offset())
                 .transpose(1, 2)?
                 .broadcast_as((b, k, n))?;
-            col.matmul(kernel, (b, m, n, k), &col_l, &kernel_l)?
+            col.matmul(kernel, (b, m, n, k), &col_l, &kernel_l, None)?
         } else {
             // Make the kernel contiguous if not already the case.
             let mut kernel_c = unsafe {
@@ -2230,7 +2271,7 @@ impl BackendStorage for CpuStorage {
             let kernel_l = Layout::contiguous_with_offset((1, n, k), kernel_l.start_offset())
                 .transpose(1, 2)?
                 .broadcast_as((b, k, n))?;
-            col.matmul(kernel, (b, m, n, k), &col_l, &kernel_l)?
+            col.matmul(kernel, (b, m, n, k), &col_l, &kernel_l, None)?
         };
         let res_l = Layout::contiguous((b, l_out, params.c_out)).transpose(1, 2)?;
         let mut res_t = unsafe { self.device().alloc_uninit(res_l.shape(), res.dtype())? };
@@ -2281,6 +2322,7 @@ impl BackendStorage for CpuStorage {
                     ),
                     &l.transpose(1, 2)?,
                     &kernel_l_mm,
+                    None,
                 )?
             };
             let col_l = Layout::contiguous((b_size, l_in, c_out, k_size));
@@ -2321,7 +2363,7 @@ impl BackendStorage for CpuStorage {
             let kernel_l = Layout::contiguous_with_offset((1, n, k), kernel_l.start_offset())
                 .transpose(1, 2)?
                 .broadcast_as((b, k, n))?;
-            col.matmul(kernel, (b, m, n, k), &col_l, &kernel_l)?
+            col.matmul(kernel, (b, m, n, k), &col_l, &kernel_l, None)?
         } else {
             // Make the kernel contiguous if not already the case.
             let mut kernel_c = unsafe {
@@ -2332,7 +2374,7 @@ impl BackendStorage for CpuStorage {
             let kernel_l = Layout::contiguous_with_offset((1, n, k), kernel_l.start_offset())
                 .transpose(1, 2)?
                 .broadcast_as((b, k, n))?;
-            col.matmul(kernel, (b, m, n, k), &col_l, &kernel_l)?
+            col.matmul(kernel, (b, m, n, k), &col_l, &kernel_l, None)?
         };
         let res_l = Layout::contiguous((b, h_out, w_out, params.c_out))
             .transpose(1, 2)?
@@ -2428,8 +2470,9 @@ impl BackendStorage for CpuStorage {
         bmnk: (usize, usize, usize, usize),
         lhs_l: &Layout,
         rhs_l: &Layout,
+        alpha: Option<f64>,
     ) -> Result<Self> {
-        MatMul(bmnk).map(self, lhs_l, rhs, rhs_l)
+        MatMul(bmnk).map(self, lhs_l, rhs, rhs_l, alpha)
     }
 
     fn device(&self) -> &Self::Device {

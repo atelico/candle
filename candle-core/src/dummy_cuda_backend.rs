@@ -146,6 +146,7 @@ impl crate::backend::BackendStorage for CudaStorage {
         _: (usize, usize, usize, usize),
         _: &Layout,
         _: &Layout,
+        _: Option<f64>,
     ) -> Result<Self> {
         Err(Error::NotCompiledWithCudaSupport)
     }

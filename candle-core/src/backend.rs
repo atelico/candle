@@ -95,6 +95,7 @@ pub trait BackendStorage: Sized {
         _: (usize, usize, usize, usize),
         _: &Layout,
         _: &Layout,
+        _: Option<f64>,
     ) -> Result<Self>;
 
     fn copy_strided_src(&self, _: &mut Self, _: usize, _: &Layout) -> Result<()>;

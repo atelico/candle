@@ -1401,6 +1401,7 @@ pub fn call_gemm(
     rhs_offset: usize,
     rhs_buffer: &Buffer,
     output: &Buffer,
+    alpha: Option<f64>,
 ) -> Result<(), MetalKernelError> {
     assert!(rhs_stride.len() >= 2);
     assert!(lhs_stride.len() >= 2);
@@ -1435,7 +1436,7 @@ pub fn call_gemm(
         })?;
     };
     let d_trans = false;
-    let alpha = 1.0f32;
+    let alpha = alpha.map(|x| x as f32).unwrap_or(1.0f32);
     let beta = 0.0f32;
     let batched = b > 1;
     let fused_activation = false;

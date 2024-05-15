@@ -1588,6 +1588,7 @@ impl BackendStorage for CudaStorage {
         (b, m, n, k): (usize, usize, usize, usize),
         lhs_l: &Layout,
         rhs_l: &Layout,
+        alpha: Option<f64>,
     ) -> Result<Self> {
         let elem_count = b * m * n;
         let dev = &self.device;
@@ -1595,7 +1596,13 @@ impl BackendStorage for CudaStorage {
             (CudaStorageSlice::BF16(lhs), CudaStorageSlice::BF16(rhs)) => {
                 let lhs = &lhs.slice(lhs_l.start_offset()..);
                 let rhs = &rhs.slice(rhs_l.start_offset()..);
-                let cfg = gemm_config(bf16::ONE, bf16::ZERO, (b, m, n, k), lhs_l, rhs_l)?;
+                let cfg = gemm_config(
+                    alpha.map(|x| bf16::from_f64_const(x)).unwrap_or(bf16::ONE),
+                    bf16::ZERO,
+                    (b, m, n, k),
+                    lhs_l,
+                    rhs_l,
+                )?;
                 let mut out = unsafe { dev.alloc::<bf16>(elem_count) }.w()?;
                 unsafe { gemm_strided_batched_bf16(&self.device.blas, cfg, rhs, lhs, &mut out) }
                     .w()?;
@@ -1604,7 +1611,13 @@ impl BackendStorage for CudaStorage {
             (CudaStorageSlice::F16(lhs), CudaStorageSlice::F16(rhs)) => {
                 let lhs = &lhs.slice(lhs_l.start_offset()..);
                 let rhs = &rhs.slice(rhs_l.start_offset()..);
-                let cfg = gemm_config(f16::ONE, f16::ZERO, (b, m, n, k), lhs_l, rhs_l)?;
+                let cfg = gemm_config(
+                    alpha.map(|x| f16::from_f64_const(x)).unwrap_or(f16::ONE),
+                    f16::ZERO,
+                    (b, m, n, k),
+                    lhs_l,
+                    rhs_l,
+                )?;
                 let mut out = unsafe { dev.alloc::<f16>(elem_count) }.w()?;
                 unsafe { gemm_strided_batched_f16(&self.device.blas, cfg, rhs, lhs, &mut out) }
                     .w()?;
@@ -1613,7 +1626,13 @@ impl BackendStorage for CudaStorage {
             (CudaStorageSlice::F32(lhs), CudaStorageSlice::F32(rhs)) => {
                 let lhs = &lhs.slice(lhs_l.start_offset()..);
                 let rhs = &rhs.slice(rhs_l.start_offset()..);
-                let cfg = gemm_config(1., 0., (b, m, n, k), lhs_l, rhs_l)?;
+                let cfg = gemm_config(
+                    alpha.map(|x| x as f32).unwrap_or(1.),
+                    0.,
+                    (b, m, n, k),
+                    lhs_l,
+                    rhs_l,
+                )?;
                 let mut out = unsafe { dev.alloc::<f32>(elem_count) }.w()?;
                 unsafe { gemm_strided_batched_f32(&self.device.blas, cfg, rhs, lhs, &mut out) }
                     .w()?;
@@ -1622,7 +1641,7 @@ impl BackendStorage for CudaStorage {
             (CudaStorageSlice::F64(lhs), CudaStorageSlice::F64(rhs)) => {
                 let lhs = &lhs.slice(lhs_l.start_offset()..);
                 let rhs = &rhs.slice(rhs_l.start_offset()..);
-                let cfg = gemm_config(1., 0., (b, m, n, k), lhs_l, rhs_l)?;
+                let cfg = gemm_config(alpha.unwrap_or(1.), 0., (b, m, n, k), lhs_l, rhs_l)?;
                 let mut out = unsafe { dev.alloc::<f64>(elem_count) }.w()?;
                 unsafe {
                     self.device

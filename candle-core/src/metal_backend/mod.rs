@@ -1338,6 +1338,7 @@ impl BackendStorage for MetalStorage {
         (b, m, n, k): (usize, usize, usize, usize),
         lhs_l: &Layout,
         rhs_l: &Layout,
+        alpha: Option<f64>,
     ) -> Result<Self> {
         let buffer = self.device.new_buffer(b * m * n, self.dtype, "matmul")?;
         let name = match self.dtype {
@@ -1363,6 +1364,7 @@ impl BackendStorage for MetalStorage {
             rhs_l.start_offset() * rhs.dtype.size_in_bytes(),
             &rhs.buffer,
             &buffer,
+            alpha,
         )
         .map_err(MetalError::from)?;
         Ok(Self::new(
