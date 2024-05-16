@@ -82,14 +82,14 @@ pub trait Map2Affine {
                 l1,
                 v2,
                 l2,
-                alpha.map(|x| bf16::from_f64_const(x)),
+                alpha.map(bf16::from_f64_const),
             )?)),
             (C::F16(v1), C::F16(v2)) => Ok(C::F16(self.f(
                 v1,
                 l1,
                 v2,
                 l2,
-                alpha.map(|x| f16::from_f64_const(x)),
+                alpha.map(f16::from_f64_const),
             )?)),
             (C::F32(v1), C::F32(v2)) => {
                 Ok(C::F32(self.f(v1, l1, v2, l2, alpha.map(|x| x as f32))?))

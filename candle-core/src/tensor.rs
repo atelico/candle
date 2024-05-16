@@ -1212,15 +1212,7 @@ impl Tensor {
         Ok(from_storage(storage, (n, c, h_out, w_out), op, false))
     }
 
-    /// Returns the matrix-multiplication of the input tensor with the other provided tensor.
-    ///
-    /// # Arguments
-    ///
-    /// * `self` - A tensor with dimensions `b1, b2, ..., bi, m, k`.
-    /// * `rhs` - A tensor with dimensions `b1, b2, ..., bi, k, n`.
-    ///
-    /// The resulting tensor has dimensions `b1, b2, ..., bi, m, n`.
-    pub fn matmul(&self, rhs: &Self) -> Result<Self> {
+    pub fn matmul_inner(&self, rhs: &Self, alpha: Option<f64>) -> Result<Self> {
         let a_dims = self.shape().dims();
         let b_dims = rhs.shape().dims();
 
@@ -1260,10 +1252,22 @@ impl Tensor {
             (batching, m, n, k),
             self.layout(),
             rhs.layout(),
-            None,
+            alpha,
         )?;
         let op = BackpropOp::new2(self, rhs, Op::Matmul);
         Ok(from_storage(storage, c_shape, op, false))
+    }
+
+    /// Returns the matrix-multiplication of the input tensor with the other provided tensor.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - A tensor with dimensions `b1, b2, ..., bi, m, k`.
+    /// * `rhs` - A tensor with dimensions `b1, b2, ..., bi, k, n`.
+    ///
+    /// The resulting tensor has dimensions `b1, b2, ..., bi, m, n`.
+    pub fn matmul(&self, rhs: &Self) -> Result<Self> {
+        self.matmul_inner(rhs, None)
     }
 
     /// Returns the matrix-multiplication of the input tensor with the other provided tensor.
@@ -1276,57 +1280,10 @@ impl Tensor {
     ///
     /// The resulting tensor has dimensions `b1, b2, ..., bi, m, n`.
     pub fn matmul_affine_fused(&self, rhs: &Self, alpha: f64) -> Result<Self> {
-        let a_dims = self.shape().dims();
-        let b_dims = rhs.shape().dims();
-
-        let dim = a_dims.len();
-
-        if dim < 2 || b_dims.len() != dim {
-            Err(Error::ShapeMismatchBinaryOp {
-                lhs: self.shape().clone(),
-                rhs: rhs.shape().clone(),
-                op: "matmul",
-            }
-            .bt())?
-        }
-
-        let m = a_dims[dim - 2];
-        let k = a_dims[dim - 1];
-        let k2 = b_dims[dim - 2];
-        let n = b_dims[dim - 1];
-
-        let c_shape = Shape::from(&a_dims[..dim - 2]).extend(&[m, n]);
-        if c_shape.elem_count() == 0 || k == 0 {
-            return Tensor::zeros(c_shape, self.dtype(), self.device());
-        }
-        let batching: usize = a_dims[..dim - 2].iter().product();
-        let batching_b: usize = b_dims[..dim - 2].iter().product();
-        if k != k2 || batching != batching_b {
-            Err(Error::ShapeMismatchBinaryOp {
-                lhs: self.shape().clone(),
-                rhs: rhs.shape().clone(),
-                op: "matmul",
-            }
-            .bt())?
-        }
-
-        let storage = self.storage().matmul(
-            &rhs.storage(),
-            (batching, m, n, k),
-            self.layout(),
-            rhs.layout(),
-            Some(alpha),
-        )?;
-        let op = BackpropOp::new2(self, rhs, Op::Matmul);
-        Ok(from_storage(storage, c_shape, op, false))
+        self.matmul_inner(rhs, Some(alpha))
     }
 
-    /// Matrix-multiplication with broadcasting support.
-    ///
-    /// Compared to `matmul` the two matrixes are allowed to have different dimensions as long as
-    /// they are compatible for broadcast. E.g. if `self` has shape `(j, 1, n, k)` and `rhs` has
-    /// shape `(l, k, m)`, the output will have shape `(j, l, n, m)`.
-    pub fn broadcast_matmul(&self, rhs: &Self) -> Result<Self> {
+    fn broadcast_matmul_inner(&self, rhs: &Self, alpha: Option<f64>) -> Result<Self> {
         let lhs = self;
         let (l_shape, r_shape) = lhs.shape().broadcast_shape_matmul(rhs.shape())?;
         let l_broadcast = l_shape != *lhs.shape();
@@ -1336,11 +1293,39 @@ impl Tensor {
             (true, true) => lhs
                 .broadcast_as(&l_shape)?
                 .contiguous()?
-                .matmul(&rhs.broadcast_as(&r_shape)?.contiguous()?),
-            (false, true) => lhs.matmul(&rhs.broadcast_as(&r_shape)?.contiguous()?),
-            (true, false) => lhs.broadcast_as(&l_shape)?.contiguous()?.matmul(rhs),
-            (false, false) => lhs.matmul(rhs),
+                .matmul_affine_fused(
+                    &rhs.broadcast_as(&r_shape)?.contiguous()?,
+                    alpha.unwrap_or(1.0),
+                ),
+            (false, true) => lhs.matmul_affine_fused(
+                &rhs.broadcast_as(&r_shape)?.contiguous()?,
+                alpha.unwrap_or(1.0),
+            ),
+            (true, false) => lhs
+                .broadcast_as(&l_shape)?
+                .contiguous()?
+                .matmul_affine_fused(rhs, alpha.unwrap_or(1.0)),
+            (false, false) => lhs.matmul_affine_fused(rhs, alpha.unwrap_or(1.0)),
         }
+    }
+
+    /// Matrix-multiplication with broadcasting support.
+    ///
+    /// Compared to `matmul` the two matrixes are allowed to have different dimensions as long as
+    /// they are compatible for broadcast. E.g. if `self` has shape `(j, 1, n, k)` and `rhs` has
+    /// shape `(l, k, m)`, the output will have shape `(j, l, n, m)`.
+    pub fn broadcast_matmul(&self, rhs: &Self) -> Result<Self> {
+        self.broadcast_matmul_inner(rhs, None)
+    }
+
+    /// Matrix-multiplication with broadcasting support.
+    /// The result is multiplied by the provided scalar `alpha`.
+    ///
+    /// Compared to `matmul` the two matrixes are allowed to have different dimensions as long as
+    /// they are compatible for broadcast. E.g. if `self` has shape `(j, 1, n, k)` and `rhs` has
+    /// shape `(l, k, m)`, the output will have shape `(j, l, n, m)`.
+    pub fn broadcast_matmul_affine_fused(&self, rhs: &Self, alpha: f64) -> Result<Self> {
+        self.broadcast_matmul_inner(rhs, Some(alpha))
     }
 
     /// Returns a tensor with the same shape as the input tensor, the values are taken from
