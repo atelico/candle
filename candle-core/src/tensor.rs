@@ -1151,7 +1151,7 @@ impl Tensor {
         Ok(from_storage(storage, (n, c, h_out, w_out), op, false))
     }
 
-    pub fn matmul_inner(&self, rhs: &Self, alpha: Option<f64>) -> Result<Self> {
+    pub fn matmul_inner(&self, rhs: &Self, alpha: Option<f32>) -> Result<Self> {
         let a_dims = self.shape().dims();
         let b_dims = rhs.shape().dims();
 
@@ -1218,11 +1218,11 @@ impl Tensor {
     /// * `rhs` - A tensor with dimensions `b1, b2, ..., bi, k, n`.
     ///
     /// The resulting tensor has dimensions `b1, b2, ..., bi, m, n`.
-    pub fn matmul_affine_fused(&self, rhs: &Self, alpha: f64) -> Result<Self> {
+    pub fn matmul_affine_fused(&self, rhs: &Self, alpha: f32) -> Result<Self> {
         self.matmul_inner(rhs, Some(alpha))
     }
 
-    fn broadcast_matmul_inner(&self, rhs: &Self, alpha: Option<f64>) -> Result<Self> {
+    fn broadcast_matmul_inner(&self, rhs: &Self, alpha: Option<f32>) -> Result<Self> {
         let lhs = self;
         let (l_shape, r_shape) = lhs.shape().broadcast_shape_matmul(rhs.shape())?;
         let l_broadcast = l_shape != *lhs.shape();
@@ -1263,7 +1263,7 @@ impl Tensor {
     /// Compared to `matmul` the two matrixes are allowed to have different dimensions as long as
     /// they are compatible for broadcast. E.g. if `self` has shape `(j, 1, n, k)` and `rhs` has
     /// shape `(l, k, m)`, the output will have shape `(j, l, n, m)`.
-    pub fn broadcast_matmul_affine_fused(&self, rhs: &Self, alpha: f64) -> Result<Self> {
+    pub fn broadcast_matmul_affine_fused(&self, rhs: &Self, alpha: f32) -> Result<Self> {
         self.broadcast_matmul_inner(rhs, Some(alpha))
     }
 

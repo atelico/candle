@@ -2470,7 +2470,7 @@ impl BackendStorage for CpuStorage {
         bmnk: (usize, usize, usize, usize),
         lhs_l: &Layout,
         rhs_l: &Layout,
-        alpha: Option<f64>,
+        alpha: Option<f32>,
     ) -> Result<Self> {
         MatMul(bmnk).map(self, lhs_l, rhs, rhs_l, alpha)
     }

@@ -209,7 +209,7 @@ impl LayerWeights {
         let k = crate::utils::repeat_kv(k, self.n_head / self.n_kv_head)?;
         let v = crate::utils::repeat_kv(v, self.n_head / self.n_kv_head)?;
 
-        let att = (q.matmul_affine_fused(&k.t()?, (self.head_dim as f64).sqrt()))?;
+        let att = (q.matmul_affine_fused(&k.t()?, 1.0 / (self.head_dim as f32).sqrt()))?;
         let att = match mask {
             None => att,
             Some(mask) => {

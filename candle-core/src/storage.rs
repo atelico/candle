@@ -711,7 +711,7 @@ impl Storage {
         bmnk: (usize, usize, usize, usize),
         lhs_layout: &Layout,
         rhs_layout: &Layout,
-        alpha: Option<f64>,
+        alpha: Option<f32>,
     ) -> Result<Self> {
         self.same_device(rhs, "matmul")?;
         self.same_dtype(rhs, "matmul")?;

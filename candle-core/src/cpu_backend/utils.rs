@@ -72,7 +72,7 @@ pub trait Map2Affine {
     ) -> Result<Vec<T>>;
 
     /// Integral types have `alpha` automatically set to None (1)
-    fn map(&self, v1: &C, l1: &Layout, v2: &C, l2: &Layout, alpha: Option<f64>) -> Result<C> {
+    fn map(&self, v1: &C, l1: &Layout, v2: &C, l2: &Layout, alpha: Option<f32>) -> Result<C> {
         match (v1, v2) {
             (C::U8(v1), C::U8(v2)) => Ok(C::U8(self.f(v1, l1, v2, l2, None)?)),
             (C::U32(v1), C::U32(v2)) => Ok(C::U32(self.f(v1, l1, v2, l2, None)?)),
@@ -82,19 +82,19 @@ pub trait Map2Affine {
                 l1,
                 v2,
                 l2,
-                alpha.map(bf16::from_f64_const),
+                alpha.map(bf16::from_f32_const),
             )?)),
             (C::F16(v1), C::F16(v2)) => Ok(C::F16(self.f(
                 v1,
                 l1,
                 v2,
                 l2,
-                alpha.map(f16::from_f64_const),
+                alpha.map(f16::from_f32_const),
             )?)),
-            (C::F32(v1), C::F32(v2)) => {
-                Ok(C::F32(self.f(v1, l1, v2, l2, alpha.map(|x| x as f32))?))
+            (C::F32(v1), C::F32(v2)) => Ok(C::F32(self.f(v1, l1, v2, l2, alpha)?)),
+            (C::F64(v1), C::F64(v2)) => {
+                Ok(C::F64(self.f(v1, l1, v2, l2, alpha.map(|x| x as f64))?))
             }
-            (C::F64(v1), C::F64(v2)) => Ok(C::F64(self.f(v1, l1, v2, l2, alpha)?)),
             _ => Err(Error::DTypeMismatchBinaryOp {
                 lhs: v1.dtype(),
                 rhs: v2.dtype(),
