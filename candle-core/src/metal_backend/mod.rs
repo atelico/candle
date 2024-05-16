@@ -801,7 +801,7 @@ impl BackendStorage for MetalStorage {
             let kernel_l = Layout::contiguous_with_offset((1, n, k), kernel_l.start_offset())
                 .transpose(1, 2)?
                 .broadcast_as((b, k, n))?;
-            col.matmul(kernel, (b, m, n, k), &col_l, &kernel_l)?
+            col.matmul(kernel, (b, m, n, k), &col_l, &kernel_l, None)?
         } else {
             // Make the kernel contiguous if not already the case.
             let mut kernel_c = self.device().zeros_impl(kernel_l.shape(), kernel.dtype())?;
@@ -809,7 +809,7 @@ impl BackendStorage for MetalStorage {
             let kernel_l = Layout::contiguous_with_offset((1, n, k), kernel_l.start_offset())
                 .transpose(1, 2)?
                 .broadcast_as((b, k, n))?;
-            col.matmul(kernel, (b, m, n, k), &col_l, &kernel_l)?
+            col.matmul(kernel, (b, m, n, k), &col_l, &kernel_l, None)?
         };
         let res_l = Layout::contiguous((b, l_out, n)).transpose(1, 2)?;
         let mut res_t = self.device().zeros_impl(res_l.shape(), res.dtype())?;
@@ -929,7 +929,7 @@ impl BackendStorage for MetalStorage {
             let kernel_l = Layout::contiguous_with_offset((1, n, k), kernel_l.start_offset())
                 .transpose(1, 2)?
                 .broadcast_as((b, k, n))?;
-            col.matmul(kernel, (b, m, n, k), &col_l, &kernel_l)?
+            col.matmul(kernel, (b, m, n, k), &col_l, &kernel_l, None)?
         } else {
             // Make the kernel contiguous if not already the case.
             let mut kernel_c = self.device().zeros_impl(kernel_l.shape(), kernel.dtype())?;
@@ -937,7 +937,7 @@ impl BackendStorage for MetalStorage {
             let kernel_l = Layout::contiguous_with_offset((1, n, k), kernel_l.start_offset())
                 .transpose(1, 2)?
                 .broadcast_as((b, k, n))?;
-            col.matmul(kernel, (b, m, n, k), &col_l, &kernel_l)?
+            col.matmul(kernel, (b, m, n, k), &col_l, &kernel_l, None)?
         };
         let res_l = Layout::contiguous((b, h_out, w_out, n))
             .transpose(1, 2)?
