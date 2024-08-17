@@ -834,41 +834,43 @@ impl GgmlType for BlockQ2K {
     }
     // https://github.com/ggerganov/llama.cpp/blob/8183159cf3def112f6d1fe94815fce70e1bffa12/k_quants.c#L354
     fn to_float(xs: &[Self], ys: &mut [f32]) -> Result<()> {
-        for (block, y) in group_for_dequantization(xs, ys)? {
-            let d = block.d.to_f32();
-            let min = block.dmin.to_f32();
+        group_for_dequantization(xs, ys)?
+            .par_iter_mut()
+            .for_each(|(block, y)| {
+                let d = block.d.to_f32();
+                let min = block.dmin.to_f32();
 
-            let mut is = 0;
+                let mut is = 0;
 
-            for (y_block, qs) in y.chunks_exact_mut(128).zip(block.qs.chunks_exact(32)) {
-                // Step by 32 over q.
-                let mut shift = 0;
-                let mut y_block_index = 0;
-                for _j in 0..4 {
-                    let sc = block.scales[is];
-                    is += 1;
-                    let dl = d * (sc & 0xF) as f32;
-                    let ml = min * (sc >> 4) as f32;
-                    for q in &qs[..16] {
-                        let y = dl * ((q >> shift) & 3) as f32 - ml;
-                        y_block[y_block_index] = y;
-                        y_block_index += 1;
+                for (y_block, qs) in y.chunks_exact_mut(128).zip(block.qs.chunks_exact(32)) {
+                    // Step by 32 over q.
+                    let mut shift = 0;
+                    let mut y_block_index = 0;
+                    for _j in 0..4 {
+                        let sc = block.scales[is];
+                        is += 1;
+                        let dl = d * (sc & 0xF) as f32;
+                        let ml = min * (sc >> 4) as f32;
+                        for q in &qs[..16] {
+                            let y = dl * ((q >> shift) & 3) as f32 - ml;
+                            y_block[y_block_index] = y;
+                            y_block_index += 1;
+                        }
+
+                        let sc = block.scales[is];
+                        is += 1;
+                        let dl = d * (sc & 0xF) as f32;
+                        let ml = min * (sc >> 4) as f32;
+                        for q in &qs[16..] {
+                            let y = dl * ((q >> shift) & 3) as f32 - ml;
+                            y_block[y_block_index] = y;
+                            y_block_index += 1;
+                        }
+
+                        shift += 2;
                     }
-
-                    let sc = block.scales[is];
-                    is += 1;
-                    let dl = d * (sc & 0xF) as f32;
-                    let ml = min * (sc >> 4) as f32;
-                    for q in &qs[16..] {
-                        let y = dl * ((q >> shift) & 3) as f32 - ml;
-                        y_block[y_block_index] = y;
-                        y_block_index += 1;
-                    }
-
-                    shift += 2;
                 }
-            }
-        }
+            });
         Ok(())
     }
 }
@@ -1101,55 +1103,56 @@ impl GgmlType for BlockQ3K {
         const KMASK1: u32 = 0x03030303;
         const KMASK2: u32 = 0x0f0f0f0f;
 
-        for (block, y) in group_for_dequantization(xs, ys)? {
-            //Reconstruct the scales
-            let mut aux = [0; 4];
-            LittleEndian::read_u32_into(&block.scales, &mut aux[0..3]);
+        group_for_dequantization(xs, ys)?
+            .par_iter_mut()
+            .for_each(|(block, y)| {
+                //Reconstruct the scales
+                let mut aux = [0; 4];
+                LittleEndian::read_u32_into(&block.scales, &mut aux[0..3]);
 
-            let tmp = aux[2];
-            aux[2] = ((aux[0] >> 4) & KMASK2) | (((tmp >> 4) & KMASK1) << 4);
-            aux[3] = ((aux[1] >> 4) & KMASK2) | (((tmp >> 6) & KMASK1) << 4);
-            aux[0] = (aux[0] & KMASK2) | (((tmp) & KMASK1) << 4);
-            aux[1] = (aux[1] & KMASK2) | (((tmp >> 2) & KMASK1) << 4);
+                let tmp = aux[2];
+                aux[2] = ((aux[0] >> 4) & KMASK2) | (((tmp >> 4) & KMASK1) << 4);
+                aux[3] = ((aux[1] >> 4) & KMASK2) | (((tmp >> 6) & KMASK1) << 4);
+                aux[0] = (aux[0] & KMASK2) | (((tmp) & KMASK1) << 4);
+                aux[1] = (aux[1] & KMASK2) | (((tmp >> 2) & KMASK1) << 4);
 
-            //Transfer the scales into an i8 array
-            let scales: &mut [i8] =
-                unsafe { std::slice::from_raw_parts_mut(aux.as_mut_ptr() as *mut i8, 16) };
+                //Transfer the scales into an i8 array
+                let scales: &mut [i8] =
+                    unsafe { std::slice::from_raw_parts_mut(aux.as_mut_ptr() as *mut i8, 16) };
 
-            let d_all = block.d.to_f32();
-            let mut m = 1;
-            let mut is = 0;
+                let d_all = block.d.to_f32();
+                let mut m = 1;
+                let mut is = 0;
 
-            // Dequantize both 128 long blocks
-            // 32 qs values per 128 long block
-            // Each 16 elements get a scale
-            for (y, qs) in y.chunks_exact_mut(128).zip(block.qs.chunks_exact(32)) {
-                let mut shift = 0;
-                for shift_scoped_y in y.chunks_exact_mut(32) {
-                    for (scale_index, scale_scoped_y) in
-                        shift_scoped_y.chunks_exact_mut(16).enumerate()
-                    {
-                        let dl = d_all * (scales[is] as f32 - 32.0);
-                        for (i, inner_y) in scale_scoped_y.iter_mut().enumerate() {
-                            let new_y = dl
-                                * (((qs[i + 16 * scale_index] >> shift) & 3) as i8
-                                    - if (block.hmask[i + 16 * scale_index] & m) == 0 {
-                                        4
-                                    } else {
-                                        0
-                                    }) as f32;
-                            *inner_y = new_y;
+                // Dequantize both 128 long blocks
+                // 32 qs values per 128 long block
+                // Each 16 elements get a scale
+                for (y, qs) in y.chunks_exact_mut(128).zip(block.qs.chunks_exact(32)) {
+                    let mut shift = 0;
+                    for shift_scoped_y in y.chunks_exact_mut(32) {
+                        for (scale_index, scale_scoped_y) in
+                            shift_scoped_y.chunks_exact_mut(16).enumerate()
+                        {
+                            let dl = d_all * (scales[is] as f32 - 32.0);
+                            for (i, inner_y) in scale_scoped_y.iter_mut().enumerate() {
+                                let new_y = dl
+                                    * (((qs[i + 16 * scale_index] >> shift) & 3) as i8
+                                        - if (block.hmask[i + 16 * scale_index] & m) == 0 {
+                                            4
+                                        } else {
+                                            0
+                                        }) as f32;
+                                *inner_y = new_y;
+                            }
+                            // 16 block finished => advance scale index
+                            is += 1;
                         }
-                        // 16 block finished => advance scale index
-                        is += 1;
+                        // 32 block finished => increase shift and m
+                        shift += 2;
+                        m <<= 1;
                     }
-                    // 32 block finished => increase shift and m
-                    shift += 2;
-                    m <<= 1;
                 }
-            }
-        }
-
+            });
         Ok(())
     }
 }
@@ -1318,32 +1321,34 @@ impl GgmlType for BlockQ4K {
     }
     // https://github.com/ggerganov/llama.cpp/blob/8183159cf3def112f6d1fe94815fce70e1bffa12/k_quants.c#L735
     fn to_float(xs: &[Self], ys: &mut [f32]) -> Result<()> {
-        for (block, y) in group_for_dequantization(xs, ys)? {
-            let d = block.d.to_f32();
-            let min = block.dmin.to_f32();
-            let q = &block.qs;
-            let mut is = 0;
-            let mut ys_index = 0;
+        group_for_dequantization(xs, ys)?
+            .par_iter_mut()
+            .for_each(|(block, y)| {
+                let d = block.d.to_f32();
+                let min = block.dmin.to_f32();
+                let q = &block.qs;
+                let mut is = 0;
+                let mut ys_index = 0;
 
-            for j in (0..QK_K).step_by(64) {
-                let q = &q[j / 2..j / 2 + 32];
-                let (sc, m) = get_scale_min_k4(is, &block.scales);
-                let d1 = d * sc as f32;
-                let m1 = min * m as f32;
-                let (sc, m) = get_scale_min_k4(is + 1, &block.scales);
-                let d2 = d * sc as f32;
-                let m2 = min * m as f32;
-                for q in q {
-                    y[ys_index] = d1 * (q & 0xF) as f32 - m1;
-                    ys_index += 1;
+                for j in (0..QK_K).step_by(64) {
+                    let q = &q[j / 2..j / 2 + 32];
+                    let (sc, m) = get_scale_min_k4(is, &block.scales);
+                    let d1 = d * sc as f32;
+                    let m1 = min * m as f32;
+                    let (sc, m) = get_scale_min_k4(is + 1, &block.scales);
+                    let d2 = d * sc as f32;
+                    let m2 = min * m as f32;
+                    for q in q {
+                        y[ys_index] = d1 * (q & 0xF) as f32 - m1;
+                        ys_index += 1;
+                    }
+                    for q in q {
+                        y[ys_index] = d2 * (q >> 4) as f32 - m2;
+                        ys_index += 1;
+                    }
+                    is += 2;
                 }
-                for q in q {
-                    y[ys_index] = d2 * (q >> 4) as f32 - m2;
-                    ys_index += 1;
-                }
-                is += 2;
-            }
-        }
+            });
         Ok(())
     }
 }
@@ -1534,39 +1539,41 @@ impl GgmlType for BlockQ5K {
 
     // https://github.com/ggerganov/llama.cpp/blob/8183159cf3def112f6d1fe94815fce70e1bffa12/k_quants.c#L928
     fn to_float(xs: &[Self], ys: &mut [f32]) -> Result<()> {
-        for (block, y) in group_for_dequantization(xs, ys)? {
-            let d = block.d.to_f32();
-            let min = block.dmin.to_f32();
-            let ql = &block.qs;
-            let qh = &block.qh;
-            let mut is = 0;
-            let mut u1 = 1;
-            let mut u2 = 2;
-            let mut ys_index = 0;
+        group_for_dequantization(xs, ys)?
+            .par_iter_mut()
+            .for_each(|(block, y)| {
+                let d = block.d.to_f32();
+                let min = block.dmin.to_f32();
+                let ql = &block.qs;
+                let qh = &block.qh;
+                let mut is = 0;
+                let mut u1 = 1;
+                let mut u2 = 2;
+                let mut ys_index = 0;
 
-            for j in (0..QK_K).step_by(64) {
-                let ql = &ql[j / 2..j / 2 + 32];
-                let (sc, m) = get_scale_min_k4(is, &block.scales);
-                let d1 = d * sc as f32;
-                let m1 = min * m as f32;
-                let (sc, m) = get_scale_min_k4(is + 1, &block.scales);
-                let d2 = d * sc as f32;
-                let m2 = min * m as f32;
-                for (ql, qh) in ql.iter().zip(qh) {
-                    let to_add = if qh & u1 != 0 { 16f32 } else { 0f32 };
-                    y[ys_index] = d1 * ((ql & 0xF) as f32 + to_add) - m1;
-                    ys_index += 1;
+                for j in (0..QK_K).step_by(64) {
+                    let ql = &ql[j / 2..j / 2 + 32];
+                    let (sc, m) = get_scale_min_k4(is, &block.scales);
+                    let d1 = d * sc as f32;
+                    let m1 = min * m as f32;
+                    let (sc, m) = get_scale_min_k4(is + 1, &block.scales);
+                    let d2 = d * sc as f32;
+                    let m2 = min * m as f32;
+                    for (ql, qh) in ql.iter().zip(qh) {
+                        let to_add = if qh & u1 != 0 { 16f32 } else { 0f32 };
+                        y[ys_index] = d1 * ((ql & 0xF) as f32 + to_add) - m1;
+                        ys_index += 1;
+                    }
+                    for (ql, qh) in ql.iter().zip(qh) {
+                        let to_add = if qh & u2 != 0 { 16f32 } else { 0f32 };
+                        y[ys_index] = d2 * ((ql >> 4) as f32 + to_add) - m2;
+                        ys_index += 1;
+                    }
+                    is += 2;
+                    u1 <<= 2;
+                    u2 <<= 2;
                 }
-                for (ql, qh) in ql.iter().zip(qh) {
-                    let to_add = if qh & u2 != 0 { 16f32 } else { 0f32 };
-                    y[ys_index] = d2 * ((ql >> 4) as f32 + to_add) - m2;
-                    ys_index += 1;
-                }
-                is += 2;
-                u1 <<= 2;
-                u2 <<= 2;
-            }
-        }
+            });
         Ok(())
     }
 }
