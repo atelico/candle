@@ -1,29 +1,29 @@
-# candle
+# ebcandle
 [![discord server](https://dcbadge.vercel.app/api/server/hugging-face-879548962464493619)](https://discord.gg/hugging-face-879548962464493619)
-[![Latest version](https://img.shields.io/crates/v/candle-core.svg)](https://crates.io/crates/candle-core)
-[![Documentation](https://docs.rs/candle-core/badge.svg)](https://docs.rs/candle-core)
-[![License](https://img.shields.io/github/license/base-org/node?color=blue)](https://github.com/huggingface/candle/blob/main/LICENSE-MIT)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)](https://github.com/huggingface/candle/blob/main/LICENSE-APACHE)
+[![Latest version](https://img.shields.io/crates/v/ebcandle-core.svg)](https://crates.io/crates/ebcandle-core)
+[![Documentation](https://docs.rs/ebcandle-core/badge.svg)](https://docs.rs/ebcandle-core)
+[![License](https://img.shields.io/github/license/base-org/node?color=blue)](https://github.com/huggingface/ebcandle/blob/main/LICENSE-MIT)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)](https://github.com/huggingface/ebcandle/blob/main/LICENSE-APACHE)
 
 **This is an optimized implmentation by Eric Buehler.**
 
 Candle is a minimalist ML framework for Rust with a focus on performance (including GPU support) 
 and ease of use. Try our online demos: 
-[whisper](https://huggingface.co/spaces/lmz/candle-whisper),
-[LLaMA2](https://huggingface.co/spaces/lmz/candle-llama2),
+[whisper](https://huggingface.co/spaces/lmz/ebcandle-whisper),
+[LLaMA2](https://huggingface.co/spaces/lmz/ebcandle-llama2),
 [T5](https://huggingface.co/spaces/radames/Candle-T5-Generation-Wasm),
-[yolo](https://huggingface.co/spaces/lmz/candle-yolo),
+[yolo](https://huggingface.co/spaces/lmz/ebcandle-yolo),
 [Segment
-Anything](https://huggingface.co/spaces/radames/candle-segment-anything-wasm).
+Anything](https://huggingface.co/spaces/radames/ebcandle-segment-anything-wasm).
 
 ## Get started
 
-Make sure that you have [`candle-core`](https://github.com/huggingface/candle/tree/main/candle-core) correctly installed as described in [**Installation**](https://huggingface.github.io/candle/guide/installation.html).
+Make sure that you have [`ebcandle-core`](https://github.com/huggingface/ebcandle/tree/main/ebcandle-core) correctly installed as described in [**Installation**](https://huggingface.github.io/ebcandle/guide/installation.html).
 
 Let's see how to run a simple matrix multiplication.
 Write the following to your `myapp/src/main.rs` file:
 ```rust
-use candle_core::{Device, Tensor};
+use ebcandle_core::{Device, Tensor};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let device = Device::Cpu;
@@ -40,7 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 `cargo run` should display a tensor of shape `Tensor[[2, 4], f32]`.
 
 
-Having installed `candle` with Cuda support, simply define the `device` to be on GPU:
+Having installed `ebcandle` with Cuda support, simply define the `device` to be on GPU:
 
 ```diff
 - let device = Device::Cpu;
@@ -52,95 +52,95 @@ For more advanced examples, please have a look at the following section.
 ## Check out our examples
 
 These online demos run entirely in your browser:
-- [yolo](https://huggingface.co/spaces/lmz/candle-yolo): pose estimation and
+- [yolo](https://huggingface.co/spaces/lmz/ebcandle-yolo): pose estimation and
   object recognition.
-- [whisper](https://huggingface.co/spaces/lmz/candle-whisper): speech recognition.
-- [LLaMA2](https://huggingface.co/spaces/lmz/candle-llama2): text generation.
+- [whisper](https://huggingface.co/spaces/lmz/ebcandle-whisper): speech recognition.
+- [LLaMA2](https://huggingface.co/spaces/lmz/ebcandle-llama2): text generation.
 - [T5](https://huggingface.co/spaces/radames/Candle-T5-Generation-Wasm): text generation.
 - [Phi-1.5, and Phi-2](https://huggingface.co/spaces/radames/Candle-Phi-1.5-Wasm): text generation.
-- [Segment Anything Model](https://huggingface.co/spaces/radames/candle-segment-anything-wasm): Image segmentation.
+- [Segment Anything Model](https://huggingface.co/spaces/radames/ebcandle-segment-anything-wasm): Image segmentation.
 - [BLIP](https://huggingface.co/spaces/radames/Candle-BLIP-Image-Captioning): image captioning.
 
 We also provide a some command line based examples using state of the art models:
 
-- [LLaMA v1, v2, and v3](./candle-examples/examples/llama/): general LLM, includes
+- [LLaMA v1, v2, and v3](./ebcandle-examples/examples/llama/): general LLM, includes
   the SOLAR-10.7B variant.
-- [Falcon](./candle-examples/examples/falcon/): general LLM.
-- [Codegeex4](./candle-examples/examples/codegeex4-9b/): Code completion,code interpreter,web search,fuction calling,repository-level
-- [GLM4](./candle-examples/examples/glm4/): Open Multilingual Multimodal Chat LMs by THUDM
-- [Gemma v1 and v2](./candle-examples/examples/gemma/): 2b and 7b+/9b general LLMs from Google Deepmind.
-- [RecurrentGemma](./candle-examples/examples/recurrent-gemma/): 2b and 7b
+- [Falcon](./ebcandle-examples/examples/falcon/): general LLM.
+- [Codegeex4](./ebcandle-examples/examples/codegeex4-9b/): Code completion,code interpreter,web search,fuction calling,repository-level
+- [GLM4](./ebcandle-examples/examples/glm4/): Open Multilingual Multimodal Chat LMs by THUDM
+- [Gemma v1 and v2](./ebcandle-examples/examples/gemma/): 2b and 7b+/9b general LLMs from Google Deepmind.
+- [RecurrentGemma](./ebcandle-examples/examples/recurrent-gemma/): 2b and 7b
   Griffin based models from Google that mix attention with a RNN like state.
-- [Phi-1, Phi-1.5, Phi-2, and Phi-3](./candle-examples/examples/phi/): 1.3b,
+- [Phi-1, Phi-1.5, Phi-2, and Phi-3](./ebcandle-examples/examples/phi/): 1.3b,
   2.7b, and 3.8b general LLMs with performance on par with 7b models.
-- [StableLM-3B-4E1T](./candle-examples/examples/stable-lm/): a 3b general LLM
+- [StableLM-3B-4E1T](./ebcandle-examples/examples/stable-lm/): a 3b general LLM
   pre-trained on 1T tokens of English and code datasets. Also supports
   StableLM-2, a 1.6b LLM trained on 2T tokens, as well as the code variants.
-- [Mamba](./candle-examples/examples/mamba/): an inference only
+- [Mamba](./ebcandle-examples/examples/mamba/): an inference only
   implementation of the Mamba state space model.
-- [Mistral7b-v0.1](./candle-examples/examples/mistral/): a 7b general LLM with
+- [Mistral7b-v0.1](./ebcandle-examples/examples/mistral/): a 7b general LLM with
   better performance than all publicly available 13b models as of 2023-09-28.
-- [Mixtral8x7b-v0.1](./candle-examples/examples/mixtral/): a sparse mixture of
+- [Mixtral8x7b-v0.1](./ebcandle-examples/examples/mixtral/): a sparse mixture of
   experts 8x7b general LLM with better performance than a Llama 2 70B model with
   much faster inference.
-- [StarCoder](./candle-examples/examples/bigcode/) and
-  [StarCoder2](./candle-examples/examples/starcoder2/): LLM specialized to code generation.
-- [Qwen1.5](./candle-examples/examples/qwen/): Bilingual (English/Chinese) LLMs.
-- [RWKV v5 and v6](./candle-examples/examples/rwkv/): An RNN with transformer level LLM
+- [StarCoder](./ebcandle-examples/examples/bigcode/) and
+  [StarCoder2](./ebcandle-examples/examples/starcoder2/): LLM specialized to code generation.
+- [Qwen1.5](./ebcandle-examples/examples/qwen/): Bilingual (English/Chinese) LLMs.
+- [RWKV v5 and v6](./ebcandle-examples/examples/rwkv/): An RNN with transformer level LLM
   performance.
-- [Replit-code-v1.5](./candle-examples/examples/replit-code/): a 3.3b LLM specialized for code completion.
-- [Yi-6B / Yi-34B](./candle-examples/examples/yi/): two bilingual
+- [Replit-code-v1.5](./ebcandle-examples/examples/replit-code/): a 3.3b LLM specialized for code completion.
+- [Yi-6B / Yi-34B](./ebcandle-examples/examples/yi/): two bilingual
   (English/Chinese) general LLMs with 6b and 34b parameters.
-- [Quantized LLaMA](./candle-examples/examples/quantized/): quantized version of
+- [Quantized LLaMA](./ebcandle-examples/examples/quantized/): quantized version of
   the LLaMA model using the same quantization techniques as
   [llama.cpp](https://github.com/ggerganov/llama.cpp).
 
-<img src="https://github.com/huggingface/candle/raw/main/candle-examples/examples/quantized/assets/aoc.gif" width="600">
+<img src="https://github.com/huggingface/ebcandle/raw/main/ebcandle-examples/examples/quantized/assets/aoc.gif" width="600">
   
-- [Stable Diffusion](./candle-examples/examples/stable-diffusion/): text to
+- [Stable Diffusion](./ebcandle-examples/examples/stable-diffusion/): text to
   image generative model, support for the 1.5, 2.1, SDXL 1.0 and Turbo versions.
 
-<img src="https://github.com/huggingface/candle/raw/main/candle-examples/examples/stable-diffusion/assets/stable-diffusion-xl.jpg" width="200">
+<img src="https://github.com/huggingface/ebcandle/raw/main/ebcandle-examples/examples/stable-diffusion/assets/stable-diffusion-xl.jpg" width="200">
 
-- [Wuerstchen](./candle-examples/examples/wuerstchen/): another text to
+- [Wuerstchen](./ebcandle-examples/examples/wuerstchen/): another text to
   image generative model.
 
-<img src="https://github.com/huggingface/candle/raw/main/candle-examples/examples/wuerstchen/assets/cat.jpg" width="200">
+<img src="https://github.com/huggingface/ebcandle/raw/main/ebcandle-examples/examples/wuerstchen/assets/cat.jpg" width="200">
 
-- [yolo-v3](./candle-examples/examples/yolo-v3/) and
-  [yolo-v8](./candle-examples/examples/yolo-v8/): object detection and pose
+- [yolo-v3](./ebcandle-examples/examples/yolo-v3/) and
+  [yolo-v8](./ebcandle-examples/examples/yolo-v8/): object detection and pose
   estimation models.
 
-<img src="https://github.com/huggingface/candle/raw/main/candle-examples/examples/yolo-v8/assets/bike.od.jpg" width="200"><img src="https://github.com/huggingface/candle/raw/main/candle-examples/examples/yolo-v8/assets/bike.pose.jpg" width="200">
-- [segment-anything](./candle-examples/examples/segment-anything/): image
+<img src="https://github.com/huggingface/ebcandle/raw/main/ebcandle-examples/examples/yolo-v8/assets/bike.od.jpg" width="200"><img src="https://github.com/huggingface/ebcandle/raw/main/ebcandle-examples/examples/yolo-v8/assets/bike.pose.jpg" width="200">
+- [segment-anything](./ebcandle-examples/examples/segment-anything/): image
   segmentation model with prompt.
 
-<img src="https://github.com/huggingface/candle/raw/main/candle-examples/examples/segment-anything/assets/sam_merged.jpg" width="200">
+<img src="https://github.com/huggingface/ebcandle/raw/main/ebcandle-examples/examples/segment-anything/assets/sam_merged.jpg" width="200">
 
-- [SegFormer](./candle-examples/examples/segformer/): transformer based semantic segmentation model.
-- [Whisper](./candle-examples/examples/whisper/): speech recognition model.
-- [EnCodec](./candle-examples/examples/encodec/): high-quality audio compression
+- [SegFormer](./ebcandle-examples/examples/segformer/): transformer based semantic segmentation model.
+- [Whisper](./ebcandle-examples/examples/whisper/): speech recognition model.
+- [EnCodec](./ebcandle-examples/examples/encodec/): high-quality audio compression
   model using residual vector quantization.
-- [MetaVoice](./candle-examples/examples/metavoice/): foundational model for
+- [MetaVoice](./ebcandle-examples/examples/metavoice/): foundational model for
   text-to-speech.
-- [Parler-TTS](./candle-examples/examples/parler-tts/): large text-to-speech
+- [Parler-TTS](./ebcandle-examples/examples/parler-tts/): large text-to-speech
   model.
-- [T5](./candle-examples/examples/t5), [Bert](./candle-examples/examples/bert/),
-  [JinaBert](./candle-examples/examples/jina-bert/) : useful for sentence embeddings.
-- [DINOv2](./candle-examples/examples/dinov2/): computer vision model trained
+- [T5](./ebcandle-examples/examples/t5), [Bert](./ebcandle-examples/examples/bert/),
+  [JinaBert](./ebcandle-examples/examples/jina-bert/) : useful for sentence embeddings.
+- [DINOv2](./ebcandle-examples/examples/dinov2/): computer vision model trained
   using self-supervision (can be used for imagenet classification, depth
   evaluation, segmentation).
-- [VGG](./candle-examples/examples/vgg/),
-  [RepVGG](./candle-examples/examples/repvgg): computer vision models.
-- [BLIP](./candle-examples/examples/blip/): image to text model, can be used to
+- [VGG](./ebcandle-examples/examples/vgg/),
+  [RepVGG](./ebcandle-examples/examples/repvgg): computer vision models.
+- [BLIP](./ebcandle-examples/examples/blip/): image to text model, can be used to
   generate captions for an image.
-- [CLIP](./candle-examples/examples/clip/): multi-model vision and language
+- [CLIP](./ebcandle-examples/examples/clip/): multi-model vision and language
   model.
-- [TrOCR](./candle-examples/examples/trocr/): a transformer OCR model, with
+- [TrOCR](./ebcandle-examples/examples/trocr/): a transformer OCR model, with
   dedicated submodels for hand-writing and printed recognition.
-- [Marian-MT](./candle-examples/examples/marian-mt/): neural machine translation
+- [Marian-MT](./ebcandle-examples/examples/marian-mt/): neural machine translation
   model, generates the translated text from the input text.
-- [Moondream](./candle-examples/examples/moondream/): tiny computer-vision model 
+- [Moondream](./ebcandle-examples/examples/moondream/): tiny computer-vision model 
   that can answer real-world questions about images.
 
 Run them using commands like:
@@ -154,18 +154,18 @@ you have cuDNN installed, use `--features cudnn` for even more speedups.
 There are also some wasm examples for whisper and
 [llama2.c](https://github.com/karpathy/llama2.c). You can either build them with
 `trunk` or try them online:
-[whisper](https://huggingface.co/spaces/lmz/candle-whisper),
-[llama2](https://huggingface.co/spaces/lmz/candle-llama2),
+[whisper](https://huggingface.co/spaces/lmz/ebcandle-whisper),
+[llama2](https://huggingface.co/spaces/lmz/ebcandle-llama2),
 [T5](https://huggingface.co/spaces/radames/Candle-T5-Generation-Wasm),
 [Phi-1.5, and Phi-2](https://huggingface.co/spaces/radames/Candle-Phi-1.5-Wasm),
-[Segment Anything Model](https://huggingface.co/spaces/radames/candle-segment-anything-wasm).
+[Segment Anything Model](https://huggingface.co/spaces/radames/ebcandle-segment-anything-wasm).
 
 For LLaMA2, run the following command to retrieve the weight files and start a
 test server:
 ```bash
-cd candle-wasm-examples/llama2-c
-wget https://huggingface.co/spaces/lmz/candle-llama2/resolve/main/model.bin
-wget https://huggingface.co/spaces/lmz/candle-llama2/resolve/main/tokenizer.json
+cd ebcandle-wasm-examples/llama2-c
+wget https://huggingface.co/spaces/lmz/ebcandle-llama2/resolve/main/model.bin
+wget https://huggingface.co/spaces/lmz/ebcandle-llama2/resolve/main/tokenizer.json
 trunk serve --release --port 8081
 ```
 And then head over to
@@ -174,22 +174,22 @@ And then head over to
 <!--- ANCHOR: useful_libraries --->
 
 ## Useful External Resources
-- [`candle-tutorial`](https://github.com/ToluClassics/candle-tutorial): A
+- [`ebcandle-tutorial`](https://github.com/ToluClassics/ebcandle-tutorial): A
   very detailed tutorial showing how to convert a PyTorch model to Candle.
-- [`candle-lora`](https://github.com/EricLBuehler/candle-lora): Efficient and
-  ergonomic LoRA implementation for Candle. `candle-lora` has      
+- [`ebcandle-lora`](https://github.com/EricLBuehler/ebcandle-lora): Efficient and
+  ergonomic LoRA implementation for Candle. `ebcandle-lora` has      
   out-of-the-box LoRA support for many models from Candle, which can be found
-  [here](https://github.com/EricLBuehler/candle-lora/tree/master/candle-lora-transformers/examples).
+  [here](https://github.com/EricLBuehler/ebcandle-lora/tree/master/ebcandle-lora-transformers/examples).
 - [`optimisers`](https://github.com/KGrewal1/optimisers): A collection of optimisers
   including SGD with momentum, AdaGrad, AdaDelta, AdaMax, NAdam, RAdam, and RMSprop.
-- [`candle-vllm`](https://github.com/EricLBuehler/candle-vllm): Efficient platform for inference and
+- [`ebcandle-vllm`](https://github.com/EricLBuehler/ebcandle-vllm): Efficient platform for inference and
   serving local LLMs including an OpenAI compatible API server.
-- [`candle-ext`](https://github.com/mokeyish/candle-ext): An extension library to Candle that provides PyTorch functions not currently available in Candle.
-- [`candle-coursera-ml`](https://github.com/vishpat/candle-coursera-ml): Implementation of ML algorithms from Coursera's [Machine Learning Specialization](https://www.coursera.org/specializations/machine-learning-introduction) course.
+- [`ebcandle-ext`](https://github.com/mokeyish/ebcandle-ext): An extension library to Candle that provides PyTorch functions not currently available in Candle.
+- [`ebcandle-coursera-ml`](https://github.com/vishpat/ebcandle-coursera-ml): Implementation of ML algorithms from Coursera's [Machine Learning Specialization](https://www.coursera.org/specializations/machine-learning-introduction) course.
 - [`kalosm`](https://github.com/floneum/floneum/tree/master/interfaces/kalosm): A multi-modal meta-framework in Rust for interfacing with local pre-trained models with support for controlled generation, custom samplers, in-memory vector databases, audio transcription, and more.
-- [`candle-sampling`](https://github.com/EricLBuehler/candle-sampling): Sampling techniques for Candle.
+- [`ebcandle-sampling`](https://github.com/EricLBuehler/ebcandle-sampling): Sampling techniques for Candle.
 - [`gpt-from-scratch-rs`](https://github.com/jeroenvlek/gpt-from-scratch-rs): A port of Andrej Karpathy's _Let's build GPT_ tutorial on YouTube showcasing the Candle API on a toy problem.
-- [`candle-einops`](https://github.com/tomsanbear/candle-einops): A pure rust implementation of the python [einops](https://github.com/arogozhnikov/einops) library.
+- [`ebcandle-einops`](https://github.com/tomsanbear/ebcandle-einops): A pure rust implementation of the python [einops](https://github.com/arogozhnikov/einops) library.
 - [`atoma-infer`](https://github.com/atoma-network/atoma-infer): A Rust library for fast inference at scale, leveraging FlashAttention2 for efficient attention computation, PagedAttention for efficient KV-cache memory management, and multi-GPU support. It is OpenAI api compatible.
 
 If you have an addition to this list, please submit a pull request.
@@ -202,7 +202,7 @@ If you have an addition to this list, please submit a pull request.
 
 - Simple syntax, looks and feels like PyTorch.
     - Model training.
-    - Embed user-defined ops/kernels, such as [flash-attention v2](https://github.com/huggingface/candle/blob/89ba005962495f2bfbda286e185e9c3c7f5300a3/candle-flash-attn/src/lib.rs#L152).
+    - Embed user-defined ops/kernels, such as [flash-attention v2](https://github.com/huggingface/ebcandle/blob/89ba005962495f2bfbda286e185e9c3c7f5300a3/ebcandle-flash-attn/src/lib.rs#L152).
 - Backends.
     - Optimized CPU backend with optional MKL support for x86 and Accelerate for macs.
     - CUDA backend for efficiently running on GPUs, multiple GPU distribution via NCCL.
@@ -270,22 +270,22 @@ Cheatsheet:
 | Arithmetic | `a + b`                                  | `&a + &b`                                                        |
 | Device     | `tensor.to(device="cuda")`               | `tensor.to_device(&Device::new_cuda(0)?)?`                            |
 | Dtype      | `tensor.to(dtype=torch.float16)`         | `tensor.to_dtype(&DType::F16)?`                                  |
-| Saving     | `torch.save({"A": A}, "model.bin")`      | `candle::safetensors::save(&HashMap::from([("A", A)]), "model.safetensors")?` |
-| Loading    | `weights = torch.load("model.bin")`      | `candle::safetensors::load("model.safetensors", &device)`        |
+| Saving     | `torch.save({"A": A}, "model.bin")`      | `ebcandle::safetensors::save(&HashMap::from([("A", A)]), "model.safetensors")?` |
+| Loading    | `weights = torch.load("model.bin")`      | `ebcandle::safetensors::load("model.safetensors", &device)`        |
 
 <!--- ANCHOR_END: cheatsheet --->
 
 
 ## Structure
 
-- [candle-core](./candle-core): Core ops, devices, and `Tensor` struct definition
-- [candle-nn](./candle-nn/): Tools to build real models
-- [candle-examples](./candle-examples/): Examples of using the library in realistic settings
-- [candle-kernels](./candle-kernels/): CUDA custom kernels
-- [candle-datasets](./candle-datasets/): Datasets and data loaders.
-- [candle-transformers](./candle-transformers): transformers-related utilities.
-- [candle-flash-attn](./candle-flash-attn): Flash attention v2 layer.
-- [candle-onnx](./candle-onnx/): ONNX model evaluation.
+- [ebcandle-core](./ebcandle-core): Core ops, devices, and `Tensor` struct definition
+- [ebcandle-nn](./ebcandle-nn/): Tools to build real models
+- [ebcandle-examples](./ebcandle-examples/): Examples of using the library in realistic settings
+- [ebcandle-kernels](./ebcandle-kernels/): CUDA custom kernels
+- [ebcandle-datasets](./ebcandle-datasets/): Datasets and data loaders.
+- [ebcandle-transformers](./ebcandle-transformers): transformers-related utilities.
+- [ebcandle-flash-attn](./ebcandle-flash-attn): Flash attention v2 layer.
+- [ebcandle-onnx](./ebcandle-onnx/): ONNX model evaluation.
 
 ## FAQ
 
@@ -315,7 +315,7 @@ Finally, Rust is cool! A lot of the HF ecosystem already has Rust crates, like [
 
 - [tch-rs](https://github.com/LaurentMazare/tch-rs.git) Bindings to the torch library in Rust. Extremely versatile, but they 
   bring in the entire torch library into the runtime. The main contributor of `tch-rs` is also involved in the development
-  of `candle`.
+  of `ebcandle`.
 
 ### Common Errors
 
@@ -335,9 +335,9 @@ or for accelerate:
 ```
 Undefined symbols for architecture arm64:
             "_dgemm_", referenced from:
-                candle_core::accelerate::dgemm::h1b71a038552bcabe in libcandle_core...
+                ebcandle_core::accelerate::dgemm::h1b71a038552bcabe in libebcandle_core...
             "_sgemm_", referenced from:
-                candle_core::accelerate::sgemm::h2cf21c592cba3c47 in libcandle_core...
+                ebcandle_core::accelerate::sgemm::h2cf21c592cba3c47 in libebcandle_core...
           ld: symbol(s) not found for architecture arm64
 ```
 
@@ -361,7 +361,7 @@ This is likely because you're not permissioned for the LLaMA-v2 model. To fix
 this, you have to register on the huggingface-hub, accept the [LLaMA-v2 model
 conditions](https://huggingface.co/meta-llama/Llama-2-7b-hf), and set up your
 authentication token. See issue
-[#350](https://github.com/huggingface/candle/issues/350) for more details.
+[#350](https://github.com/huggingface/ebcandle/issues/350) for more details.
 
 #### Missing cute/cutlass headers when compiling flash-attn
 
@@ -394,7 +394,7 @@ env NVCC_CCBIN=/usr/lib/gcc/x86_64-linux-gnu/10 cargo ...
 
 ```
 Couldn't compile the test.
----- .\candle-book\src\inference\hub.md - Using_the_hub::Using_in_a_real_model_ (line 50) stdout ----
+---- .\ebcandle-book\src\inference\hub.md - Using_the_hub::Using_in_a_real_model_ (line 50) stdout ----
 error: linking with `link.exe` failed: exit code: 1181
 //very long chain of linking
  = note: LINK : fatal error LNK1181: cannot open input file 'windows.0.48.5.lib'
@@ -403,7 +403,7 @@ error: linking with `link.exe` failed: exit code: 1181
 Make sure you link all native libraries that might be located outside a project target, e.g., to run mdbook tests, you should run:
 
 ```
-mdbook test candle-book -L .\target\debug\deps\ `
+mdbook test ebcandle-book -L .\target\debug\deps\ `
 -L native=$env:USERPROFILE\.cargo\registry\src\index.crates.io-6f17d22bba15001f\windows_x86_64_msvc-0.42.2\lib `
 -L native=$env:USERPROFILE\.cargo\registry\src\index.crates.io-6f17d22bba15001f\windows_x86_64_msvc-0.48.5\lib
 ```
@@ -415,7 +415,7 @@ This may be caused by the models being loaded from `/mnt/c`, more details on
 
 #### Tracking down errors
 
-You can set `RUST_BACKTRACE=1` to be provided with backtraces when a candle
+You can set `RUST_BACKTRACE=1` to be provided with backtraces when a ebcandle
 error is generated.
 
 #### CudaRC error

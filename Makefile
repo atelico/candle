@@ -2,10 +2,10 @@
 
 clean-ptx:
 	find target -name "*.ptx" -type f -delete
-	echo "" > candle-kernels/src/lib.rs
-	touch candle-kernels/build.rs
-	touch candle-examples/build.rs
-	touch candle-flash-attn/build.rs
+	echo "" > ebcandle-kernels/src/lib.rs
+	touch ebcandle-kernels/build.rs
+	touch ebcandle-examples/build.rs
+	touch ebcandle-flash-attn/build.rs
 
 clean:
 	cargo clean

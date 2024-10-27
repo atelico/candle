@@ -1,0 +1,35 @@
+[package]
+name = "ebcandle-pyo3"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+license.workspace = true
+readme = "README.md"
+
+[lib]
+name = "ebcandle"
+crate-type = ["cdylib"]
+
+[dependencies]
+accelerate-src = { workspace = true, optional = true }
+ebcandle = { workspace = true }
+ebcandle-nn = { workspace = true }
+ebcandle-onnx = { workspace = true, optional = true }
+half = { workspace = true }
+float8 = { workspace = true }
+intel-mkl-src = { workspace = true, optional = true }
+pyo3 = { version = "0.22.0", features = ["extension-module", "abi3-py38"] }
+
+[build-dependencies]
+pyo3-build-config = "0.22"
+
+[features]
+default = []
+accelerate = ["dep:accelerate-src", "ebcandle/accelerate"]
+cuda = ["ebcandle/cuda"]
+mkl = ["dep:intel-mkl-src","ebcandle/mkl"]
+onnx = ["dep:ebcandle-onnx"]
+

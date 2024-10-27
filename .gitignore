@@ -30,14 +30,14 @@ flamegraph.svg
 *.swo
 trace-*.json
 
-candle-wasm-examples/*/build
-candle-wasm-examples/*/*.bin
-candle-wasm-examples/*/*.jpeg
-candle-wasm-examples/*/audios/*.wav
-candle-wasm-examples/**/*.safetensors
-candle-wasm-examples/**/*.gguf
-candle-wasm-examples/*/package-lock.json
-candle-wasm-examples/**/config*.json
+ebcandle-wasm-examples/*/build
+ebcandle-wasm-examples/*/*.bin
+ebcandle-wasm-examples/*/*.jpeg
+ebcandle-wasm-examples/*/audios/*.wav
+ebcandle-wasm-examples/**/*.safetensors
+ebcandle-wasm-examples/**/*.gguf
+ebcandle-wasm-examples/*/package-lock.json
+ebcandle-wasm-examples/**/config*.json
 .DS_Store
 .idea/*
 __pycache__
