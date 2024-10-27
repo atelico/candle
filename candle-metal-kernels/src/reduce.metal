@@ -304,56 +304,6 @@ kernel void NAME( \
 } \
 
 template<typename T>
-METAL_FUNC void rmsnorm(
-    constant size_t & src_numel,
-    constant size_t & el_to_sum_per_block,
-    device const T * src,
-    device T * dst,
-    device const T * alpha,
-    constant float & eps,
-    uint id,
-    uint tid,
-    uint dst_id,
-    uint block_dim,
-    threadgroup float * shared_memory
-) {
-    size_t start_idx = dst_id * el_to_sum_per_block;
-    size_t stop_idx = min(start_idx + el_to_sum_per_block, src_numel);
-    size_t idx = start_idx + tid;
-
-    float tmp = 0;
-    while (idx < stop_idx) {
-        tmp = tmp + float(src[idx]) * float(src[idx]);
-        idx += block_dim;
-    }
-    shared_memory[tid] = tmp;
-
-    threadgroup_barrier(mem_flags::mem_threadgroup);
-
-    for (uint s = block_dim / 2; s > 0; s >>= 1) {
-        if (tid < s) {
-            shared_memory[tid] = shared_memory[tid] + shared_memory[tid + s];
-        }
-        threadgroup_barrier(mem_flags::mem_threadgroup);
-    }
-
-    /* wait for shared_memory[0] to be filled */
-    threadgroup_barrier(mem_flags::mem_threadgroup);
-
-    float norm = sqrt(shared_memory[0] / float(el_to_sum_per_block) + eps);
-    float inv_norm = 1.0f / norm;
-    idx = start_idx + tid;
-    while (idx < stop_idx) {
-        float val = float(src[idx]) * inv_norm;
-        if (alpha != nullptr) {
-            val *= float(alpha[idx - start_idx]);
-        }
-        dst[idx] = T(val);
-        idx += block_dim;
-    }
-}
-
-template<typename T>
 METAL_FUNC void layernorm(
     constant size_t & src_numel,
     constant size_t & el_to_sum_per_block,
@@ -411,24 +361,6 @@ METAL_FUNC void layernorm(
         idx += block_dim;
     }
 }
-
-#define RMSNORM(NAME, T) \
-kernel void NAME( \
-    constant size_t &src_numel, \
-    constant size_t &el_to_sum_per_block, \
-    device const T *src, \
-    device T *dst, \
-    device const T *alpha, \
-    constant float &eps, \
-    uint id [[ thread_position_in_grid ]], \
-    uint tid [[ thread_index_in_threadgroup ]], \
-    uint dst_id [[ threadgroup_position_in_grid ]], \
-    uint block_dim [[ threads_per_threadgroup ]] \
-) { \
-    threadgroup float shared_memory[THREADGROUP_SIZE]; \
-    shared_memory[tid] = 0; \
-    rmsnorm<T>(src_numel, el_to_sum_per_block, src, dst, alpha, eps, id, tid, dst_id, block_dim, shared_memory); \
-} \
 
 #define LAYERNORM(NAME, T) \
 kernel void NAME( \
@@ -587,8 +519,6 @@ ARGMAX(fast_argmax_u8_strided, uint8_t, 0)
 
 SOFTMAX(softmax_f32, float)
 SOFTMAX(softmax_f16, half)
-RMSNORM(rmsnorm_f32, float)
-RMSNORM(rmsnorm_f16, half)
 LAYERNORM(layernorm_f32, float)
 LAYERNORM(layernorm_f16, half)
 ROPE(rope_f32, rope_i_f32, rope_thd_f32, float)
@@ -626,7 +556,6 @@ REDUCE(MIN(x, y), fast_min_bf16_strided, bfloat, HUGE_VALBF)
 ARGMIN(fast_argmin_bf16, bfloat, HUGE_VALBF)
 ARGMAX(fast_argmax_bf16, bfloat, -HUGE_VALBF)
 SOFTMAX(softmax_bf16, bfloat)
-RMSNORM(rmsnorm_bf16, bfloat)
 LAYERNORM(layernorm_bf16, bfloat)
 ROPE(rope_bf16, rope_i_bf16, rope_thd_bf16, bfloat)
 #endif

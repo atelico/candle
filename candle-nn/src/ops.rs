@@ -577,13 +577,13 @@ impl candle::CustomOp2 for RmsNorm {
         l2: &Layout,
     ) -> Result<(candle::MetalStorage, Shape)> {
         use candle::backend::BackendStorage;
+        use candle_metal_kernels::RmsNormDType;
+
         let device = s1.device();
         let command_buffer = device.command_buffer()?;
         let kernels = device.kernels();
-        let name = match (s1.dtype(), s2.dtype()) {
-            (DType::F32, DType::F32) => "rmsnorm_f32",
-            (DType::F16, DType::F16) => "rmsnorm_f16",
-            (DType::BF16, DType::BF16) => "rmsnorm_bf16",
+        match (s1.dtype(), s2.dtype()) {
+            (DType::F32, DType::F32) | (DType::F16, DType::F16) | (DType::BF16, DType::BF16) => (),
             (dt1, dt2) => candle::bail!("rmsnorm is not implemented for {dt1:?} {dt2:?}"),
         };
 
@@ -591,21 +591,27 @@ impl candle::CustomOp2 for RmsNorm {
             candle::bail!("Non contiguous rmsnorm is not implemented");
         }
 
-        let last_dim = l1.dims()[l1.shape().rank() - 1];
+        let ty: RmsNormDType = match s1.dtype() {
+            DType::BF16 => RmsNormDType::BF16,
+            DType::F16 => RmsNormDType::F16,
+            DType::F32 => RmsNormDType::F32,
+            _ => unreachable!(),
+        };
+
         let elem_count = l1.shape().elem_count();
         let output = device.new_buffer(elem_count, s1.dtype(), "rmsnorm")?;
         candle_metal_kernels::call_rms_norm(
             device.metal_device(),
             &command_buffer,
             kernels,
-            name,
-            elem_count,
-            last_dim,
+            ty,
             self.eps,
+            l1.dims(),
             s1.buffer(),
-            l1.start_offset() * s1.dtype().size_in_bytes(),
+            l1.start_offset(),
+            l2.stride(),
             s2.buffer(),
-            l2.start_offset() * s2.dtype().size_in_bytes(),
+            l2.start_offset(),
             &output,
         )
         .map_err(candle::Error::wrap)?;

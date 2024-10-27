@@ -53,3 +53,27 @@ fn layer_norm() -> Result<()> {
     );
     Ok(())
 }
+
+#[test]
+fn rms_norm() -> Result<()> {
+    #[cfg(not(feature = "metal"))]
+    let dev = Device::cuda_if_available(0)?;
+    #[cfg(feature = "metal")]
+    let dev = Device::new_metal(0)?;
+
+    const DIM: usize = 4096;
+
+    let data = Tensor::randn(0f32, 1f32, (32, DIM), &dev)?;
+    let w = Tensor::randn(0f32, 1f32, (DIM,), &dev)?;
+
+    let fused = candle_nn::ops::rms_norm(&data, &w, 1e-6)?.clone();
+    let truth = candle_nn::ops::rms_norm_slow(&data, &w, 1e-6)?;
+
+    let error: f32 = ((&truth - &fused)?.abs()? / &truth.abs()?)?
+    .sum_all()?
+    .to_scalar()?;
+
+    assert!(error <= 0.008, "{}", error);
+
+    Ok(())
+}
