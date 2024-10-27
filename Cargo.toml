@@ -20,7 +20,7 @@ exclude = [
 resolver = "2"
 
 [workspace.package]
-version = "0.7.2"
+version = "0.7.3"
 edition = "2021"
 description = "Minimalist ML framework."
 repository = "https://github.com/huggingface/ebcandle"
@@ -33,14 +33,14 @@ ab_glyph = "0.2.23"
 accelerate-src = { version = "0.3.2" }
 anyhow = { version = "1", features = ["backtrace"] }
 byteorder = "1.4.3"
-ebcandle = { path = "./ebcandle-core", package = "ebcandle-core", version = "0.7.2" }
-ebcandle-datasets = { path = "./ebcandle-datasets", version = "0.7.2" }
-ebcandle-flash-attn = { path = "./ebcandle-flash-attn", version = "0.7.2" }
-ebcandle-kernels = { path = "./ebcandle-kernels", version = "0.7.2" }
-ebcandle-metal-kernels = { path = "./ebcandle-metal-kernels", version = "0.7.2" }
-ebcandle-nn = { path = "./ebcandle-nn", version = "0.7.2" }
-ebcandle-onnx = { path = "./ebcandle-onnx", version = "0.7.2" }
-ebcandle-transformers = { path = "./ebcandle-transformers", version = "0.7.2" }
+ebcandle = { path = "./ebcandle-core", package = "ebcandle-core", version = "0.7.3" }
+ebcandle-datasets = { path = "./ebcandle-datasets", version = "0.7.3" }
+ebcandle-flash-attn = { path = "./ebcandle-flash-attn", version = "0.7.3" }
+ebcandle-kernels = { path = "./ebcandle-kernels", version = "0.7.3" }
+ebcandle-metal-kernels = { path = "./ebcandle-metal-kernels", version = "0.7.3" }
+ebcandle-nn = { path = "./ebcandle-nn", version = "0.7.3" }
+ebcandle-onnx = { path = "./ebcandle-onnx", version = "0.7.3" }
+ebcandle-transformers = { path = "./ebcandle-transformers", version = "0.7.3" }
 clap = { version = "4.2.4", features = ["derive"] }
 criterion = { version = "0.5.1", default-features=false }
 cudarc = { version = "0.12.1", features = ["std", "cublas", "cublaslt", "curand", "driver", "nvrtc", "f16", "cuda-version-from-build-system", "dynamic-linking"], default-features=false }
@@ -74,7 +74,7 @@ tracing-subscriber = "0.3.7"
 ug = "0.0.2"
 ug-cuda = "0.0.2"
 ug-metal = "0.0.2"
-yoke = { version = "0.7.2", features = ["derive"] }
+yoke = { version = "0.7.3", features = ["derive"] }
 zip = { version = "1.1.1", default-features = false }
 metal = { version = "0.27.0", features = ["mps"]}
 

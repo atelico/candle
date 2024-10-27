@@ -1,6 +1,6 @@
 [package]
 name = "ebcandle-flash-attn"
-version = "0.7.2"
+version = "0.7.3"
 edition = "2021"
 
 description = "Flash attention layer for the ebcandle ML framework."
@@ -11,7 +11,7 @@ license = "MIT OR Apache-2.0"
 readme = "README.md"
 
 [dependencies]
-ebcandle = { path = "../ebcandle-core", features = ["cuda"], package = "ebcandle-core", version = "0.7.2" }
+ebcandle = { path = "../ebcandle-core", features = ["cuda"], package = "ebcandle-core", version = "0.7.3" }
 half = { version = "2.3.1", features = ["num-traits"] }
 
 [build-dependencies]
