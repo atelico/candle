@@ -8,6 +8,7 @@ mod dummy_cuda;
 mod dummy_metal;
 pub mod ggml_file;
 pub mod gguf_file;
+pub mod iq_quants;
 pub mod k_quants;
 #[cfg(feature = "metal")]
 pub mod metal;
@@ -157,6 +158,7 @@ pub enum GgmlDType {
     Q5K,
     Q6K,
     Q8K,
+    Q4KXS,
 }
 
 impl GgmlDType {
