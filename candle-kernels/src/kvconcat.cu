@@ -45,6 +45,10 @@ KVCONCAT_OP(double, kvconcat_f64)
 KVCONCAT_OP(float, kvconcat_f32)
 
 #if __CUDA_ARCH__ >= 530
+#if __CUDA_ARCH__ < 800
+#include "cuda_bf16.h"
+KVCONCAT_OP(__nv_bfloat16, kvconcat_bf16)
+#endif
 KVCONCAT_OP(__half, kvconcat_f16)
 #endif
 
