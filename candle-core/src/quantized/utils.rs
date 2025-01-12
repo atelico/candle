@@ -1,4 +1,8 @@
+use half::f16;
+
 use crate::Result;
+
+const GROUP_MAX_EPS: f32 = 1e-15;
 
 pub(super) fn nearest_int(v: f32) -> i32 {
     v.round() as i32
@@ -559,4 +563,235 @@ pub(super) fn make_qp_quants(
     }
 
     sumlx / suml2
+}
+
+fn best_index_int8(n: usize, val: &[i8], x: f32) -> usize {
+    if x <= val[0] as f32 {
+        return 0;
+    }
+    if x >= val[n - 1] as f32 {
+        return n - 1;
+    }
+    let mut ml = 0_usize;
+    let mut mu = n - 1;
+    while mu - ml > 1 {
+        let mav = (ml + mu) / 2;
+        if x < val[mav] as f32 {
+            mu = mav;
+        } else {
+            ml = mav;
+        }
+    }
+    let dist_low = (x - val[mu - 1] as f32).abs();
+    let dist_high = (val[mu] as f32 - x).abs();
+    if dist_low < dist_high {
+        mu - 1
+    } else {
+        mu
+    }
+}
+
+#[allow(non_snake_case)]
+pub(super) fn quantize_iq4_nl(
+    xs_block: &[f32],
+    super_block_size: usize,
+    block_size: usize,
+    d: &mut f16,
+    qs: &mut [u8],
+    scales_h: &mut [u16],
+    scales_l: &mut [u8],
+    values: &[i8],
+    quant_weights: Option<&[f32]>,
+    ntry: i32,
+) {
+    // 1. Compute sigma2 = sum(x^2) * 2.f/super_block_size
+    let mut sigma2 = 0.0f32;
+    for &val in xs_block.iter() {
+        sigma2 += val * val;
+    }
+    sigma2 *= 2.0 / (super_block_size as f32);
+
+    // 2. Zero out q4 region for safety (super_block_size/2 bytes)
+    //    (Your block_out struct might store q4 in an array of length super_block_size/2)
+    qs.iter_mut().for_each(|x| *x = 0);
+
+    // 3. dh[0] = 0 (in half float). We store it in block_out.dm for example:
+    *d = f16::from_f32(0.); // you may convert to half if needed
+
+    // We'll store sub-block scales in a temporary float array
+    let mut scales = vec![0.0f32; super_block_size / block_size];
+    let mut weight = vec![0.0f32; block_size];
+    // We'll store indexes in a temporary array L
+    let mut L = vec![0u8; super_block_size];
+
+    let mut max_scale = 0.0f32;
+    let mut amax_scale = 0.0f32;
+    let nb = super_block_size / block_size;
+
+    // 4. For each sub-block ib
+    for ib in 0..nb {
+        let start = ib * block_size;
+        let end = start + block_size;
+        let xb = &xs_block[start..end];
+        let Lb = &mut L[start..end];
+
+        // optional quant_weights
+        if let Some(qw) = quant_weights {
+            let qw_block = &qw[start..end];
+            for j in 0..block_size {
+                // weight[j] = qw[j] * sqrtf(sigma2 + xb[j]^2)
+                weight[j] = qw_block[j] * (sigma2 + xb[j] * xb[j]).sqrt();
+            }
+        } else {
+            // weight[j] = xb[j]^2
+            for j in 0..block_size {
+                weight[j] = xb[j] * xb[j];
+            }
+        }
+
+        // 5. find amax and max
+        let mut amax = 0.0f32;
+        let mut max = 0.0f32;
+        for &v in xb.iter() {
+            let ax = v.abs();
+            if ax > amax {
+                amax = ax;
+                max = v;
+            }
+        }
+        // 6. if (amax < GROUP_MAX_EPS) => scales[ib] = 0; continue
+        if amax < GROUP_MAX_EPS {
+            scales[ib] = 0.0;
+            continue;
+        }
+
+        // 7. do the initial d = ±(max/values[0]) (depending on ntry>0)
+        let sign = if ntry > 0 { -1.0 } else { 1.0 };
+        let mut d = sign * (max / (values[0] as f32));
+        let id = 1.0 / d;
+        let mut sumqx = 0.0f32;
+        let mut sumq2 = 0.0f32;
+
+        // 7a. compute sumqx, sumq2 with that scale
+        for j in 0..block_size {
+            let al = id * xb[j];
+            let l = best_index_int8(16, &values, al);
+            let q = values[l] as f32;
+            let w = weight[j];
+            sumqx += w * q * xb[j];
+            sumq2 += w * q * q;
+            Lb[j] = l as u8;
+        }
+        // 7b. refine d => sumqx / sumq2
+        if sumq2 != 0.0 {
+            d = sumqx / sumq2;
+        }
+        let mut best = d * sumqx;
+
+        // 8. search in range -ntry..ntry
+        for itry in -ntry..=ntry {
+            let itryf = itry as f32;
+            // id = (itry + values[0]) / max (from the code)
+            let attempt_id = (itryf + values[0] as f32) / max;
+            let mut attempt_sumqx = 0.0f32;
+            let mut attempt_sumq2 = 0.0f32;
+            for j in 0..block_size {
+                let al = attempt_id * xb[j];
+                let l = best_index_int8(16, &values, al);
+                let q = values[l] as f32;
+                let w = weight[j];
+                attempt_sumqx += w * q * xb[j];
+                attempt_sumq2 += w * q * q;
+            }
+            if attempt_sumq2 > 0.0 {
+                let candidate_d = attempt_sumqx / attempt_sumq2;
+                let candidate_val = candidate_d * attempt_sumqx;
+                if candidate_val * candidate_val > best * attempt_sumq2 {
+                    d = candidate_d;
+                    best = candidate_val;
+                }
+            }
+        }
+
+        // store final scale for this sub-block
+        scales[ib] = d;
+        let abs_d = d.abs();
+        if abs_d > amax_scale {
+            amax_scale = abs_d;
+            max_scale = d;
+        }
+    }
+
+    // 9. Now handle the second pass if we have more than one sub-block
+    if nb > 1 {
+        // block_out.dm = half of d => from the code: d = -max_scale/32
+        let d_f32 = -max_scale / 32.0;
+        *d = f16::from_f32(d_f32); // or convert to half as needed
+
+        let id = if d_f32 != 0.0 { 1.0 / d_f32 } else { 0.0 };
+
+        // scales_h/l might be stored in block_out as arrays
+        // zero out scales_h first
+        scales_h.iter_mut().for_each(|x| *x = 0);
+
+        for ib in 0..nb {
+            // nearest int in the range [-32..31]
+            let mut l = nearest_int(id * scales[ib]);
+            l = l.clamp(-32, 31);
+
+            // compute dl = d*l
+            let dl = d_f32 * (l as f32);
+            let idl = if dl != 0.0 { 1.0 / dl } else { 0.0 };
+
+            let start = ib * block_size;
+            let end = start + block_size;
+            let xb = &xs_block[start..end];
+            let Lb = &mut L[start..end];
+
+            // re-assign Lb with the refined scale
+            for j in 0..block_size {
+                let al = idl * xb[j];
+                let idx = best_index_int8(16, &values, al);
+                Lb[j] = idx as u8;
+            }
+
+            // pack l into scales_h/l
+            let l_packed = (l + 32) as u8; // shift from [-32..31] to [0..63]
+            let l_l = l_packed & 0xF;
+            let l_h = l_packed >> 4;
+
+            // store into block_out.scales_l[ib/2], block_out.scales_h[ib/8]
+            if ib % 2 == 0 {
+                scales_l[ib / 2] = l_l;
+            } else {
+                scales_l[ib / 2] |= l_l << 4;
+            }
+            scales_h[ib / 8] |= (l_h as u16) << (2 * (ib as u16 % 8)) ;
+        }
+    } else {
+        // super_block_size/block_size <= 1
+        // the code sets block_out.dm = scales[0]
+        *d = f16::from_f32(scales[0]);
+        if ntry > 0 {
+            let id = if scales[0] != 0.0 {
+                1.0 / scales[0]
+            } else {
+                0.0
+            };
+            for j in 0..super_block_size {
+                let idx = best_index_int8(16, &values, id * xs_block[j]);
+                L[j] = idx as u8;
+            }
+        }
+    }
+
+    // 10. Finally, build q4 from L
+    // "for i in 0..super_block_size/32 { for j in 0..16 { q4[16*i + j] = L[32*i + j] | (L[32*i + 16 + j] << 4) } }"
+    for i in 0..(super_block_size / 32) {
+        for j in 0..16 {
+            let l0 = L[32 * i + j];
+            let l1 = L[32 * i + 16 + j] << 4;
+            qs[16 * i + j] = l0 | l1;
+        }
+    }
 }
