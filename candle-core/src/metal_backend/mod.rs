@@ -414,6 +414,7 @@ impl BackendStorage for MetalStorage {
                 (DType::I64, DType::F32) => "cast_i64_f32",
                 (DType::I64, DType::U32) => "cast_i64_u32",
                 (DType::I64, DType::U8) => "cast_i64_u8",
+                (DType::I64, DType::F8E4M3) => "cast_i64_f8e4m3",
 
                 (DType::F16, DType::BF16) => "cast_f16_bf16",
                 (DType::F16, DType::F32) => "cast_f16_f32",
@@ -430,6 +431,10 @@ impl BackendStorage for MetalStorage {
                 (DType::BF16, DType::I64) => "cast_bf16_i64",
                 (DType::BF16, DType::U32) => "cast_bf16_u32",
                 (DType::BF16, DType::U8) => "cast_bf16_u8",
+
+                (DType::F8E4M3, DType::BF16) => "cast_f8e4m3_bf16",
+
+                (DType::F8E4M3, DType::F32) => "cast_f8e4m3_f32",
 
                 (left, right) => {
                     crate::bail!("Metal contiguous to_dtype {left:?} {right:?} not implemented")
@@ -1528,15 +1533,6 @@ impl BackendStorage for MetalStorage {
         rhs_l: &Layout,
         c_l: &Layout,
     ) -> Result<()> {
-        let name = match self.dtype {
-            DType::F32 => "sgemm",
-            DType::F16 => "hgemm",
-            DType::BF16 => "bgemm",
-            dtype => {
-                return Err(MetalError::Message(format!("matmul doesn't support {dtype:?}")).into())
-            }
-        };
-
         let elem_count = b * m * n;
 
         match c_l.contiguous_offsets() {
@@ -1552,12 +1548,24 @@ impl BackendStorage for MetalStorage {
         };
 
         let command_buffer = self.device.command_buffer()?;
-        command_buffer.set_label("matmul");
-        candle_metal_kernels::call_gemm(
+        command_buffer.set_label("matmul_with_alpha_beta");
+
+        let dtype = match self.dtype {
+            DType::F32 => candle_metal_kernels::GemmDType::F32,
+            DType::F16 => candle_metal_kernels::GemmDType::F16,
+            DType::BF16 => candle_metal_kernels::GemmDType::BF16,
+            dtype => {
+                return Err(MetalError::Message(format!(
+                    "matmul_with_alpha_beta doesn't support {dtype:?}"
+                ))
+                .into())
+            }
+        };
+        candle_metal_kernels::call_mlx_addmm(
             &self.device.device,
             &command_buffer,
             &self.device.kernels,
-            name,
+            dtype,
             (b, m, n, k),
             lhs_l.stride(),
             lhs_l.start_offset() * self.dtype.size_in_bytes(),
@@ -1565,11 +1573,15 @@ impl BackendStorage for MetalStorage {
             rhs_l.stride(),
             rhs_l.start_offset() * rhs.dtype.size_in_bytes(),
             &rhs.buffer,
+            c_l.stride(),
+            c_l.start_offset() * c.dtype.size_in_bytes(),
+            &c.buffer,
             &c.buffer,
             s.unwrap_or(1.) as f32,
             1.,
         )
         .map_err(MetalError::from)?;
+
         Ok(())
     }
 
@@ -1581,9 +1593,11 @@ impl BackendStorage for MetalStorage {
         lhs_l: &Layout,
         rhs_l: &Layout,
     ) -> Result<Self> {
-        let buffer = self.device.new_buffer(b * m * n, self.dtype, "matmul")?;
+        let buffer = self
+            .device
+            .new_buffer(b * m * n, self.dtype, "matmul_with_alpha")?;
         let command_buffer = self.device.command_buffer()?;
-        command_buffer.set_label("matmul");
+        command_buffer.set_label("matmul_with_alpha");
         if self.dtype == DType::BF16 {
             if s.unwrap_or(1.) != 1. {
                 return Err(
@@ -2051,19 +2065,12 @@ impl MetalStorage {
     }
 
     pub(crate) fn to_cpu<T: Clone>(&self) -> Result<Vec<T>> {
-        let size = (self.count * self.dtype.size_in_bytes()) as NSUInteger;
-
-        let buffer = self.device.new_buffer_managed(size)?;
-        {
-            let command_buffer = self.device.command_buffer()?;
-            command_buffer.set_label("to_cpu");
-            let blit = command_buffer.new_blit_command_encoder();
-            blit.set_label("blit_to_cpu");
-            blit.copy_from_buffer(&self.buffer, 0, &buffer, 0, size);
-            blit.end_encoding();
-        }
         self.device.wait_until_completed()?;
-        Ok(read_to_vec(&buffer, self.count))
+
+        let ptr = self.buffer.contents() as *mut T;
+        assert!(!ptr.is_null());
+        let slice = unsafe { std::slice::from_raw_parts(ptr, self.count) };
+        Ok(slice.to_vec())
     }
 }
 
@@ -2081,7 +2088,7 @@ impl BackendDevice for MetalDevice {
         let seed = Arc::new(Mutex::new(device.new_buffer_with_data(
             [299792458].as_ptr() as *const c_void,
             4,
-            MTLResourceOptions::StorageModeManaged,
+            MTLResourceOptions::StorageModeShared,
         )));
         let commands = device::Commands::new(command_queue)?;
         Ok(Self {
@@ -2175,7 +2182,7 @@ impl BackendDevice for MetalDevice {
             CpuStorageRef::F16(storage) => (storage.len(), self.new_buffer_with_data(storage)),
             CpuStorageRef::F32(storage) => (storage.len(), self.new_buffer_with_data(storage)),
             CpuStorageRef::F64(storage) => (storage.len(), self.new_buffer_with_data(storage)),
-            CpuStorageRef::F8E4M3(_) => crate::bail!("Metal device does not yet support F8E4M3."),
+            CpuStorageRef::F8E4M3(storage) => (storage.len(), self.new_buffer_with_data(storage)),
         };
         Ok(Self::Storage::new(buffer?, self.clone(), count, T::DTYPE))
     }
@@ -2191,7 +2198,7 @@ impl BackendDevice for MetalDevice {
             CpuStorage::F16(storage) => (storage.len(), self.new_buffer_with_data(storage)),
             CpuStorage::F32(storage) => (storage.len(), self.new_buffer_with_data(storage)),
             CpuStorage::F64(storage) => (storage.len(), self.new_buffer_with_data(storage)),
-            CpuStorage::F8E4M3(_) => crate::bail!("Metal device does not yet support F8E4M3."),
+            CpuStorage::F8E4M3(storage) => (storage.len(), self.new_buffer_with_data(storage)),
         };
         Ok(Self::Storage::new(
             buffer?,
@@ -2301,11 +2308,4 @@ impl BackendDevice for MetalDevice {
     fn synchronize(&self) -> Result<()> {
         self.wait_until_completed()
     }
-}
-
-fn read_to_vec<T: Clone>(buffer: &Buffer, n: usize) -> Vec<T> {
-    let ptr = buffer.contents() as *const T;
-    assert!(!ptr.is_null());
-    let slice = unsafe { std::slice::from_raw_parts(ptr, n) };
-    slice.to_vec()
 }
