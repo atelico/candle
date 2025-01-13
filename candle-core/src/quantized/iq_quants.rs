@@ -33,7 +33,7 @@ impl GgmlType for BlockIQ4xs {
     const BLCK_SIZE: usize = QK_K;
     type VecDotType = BlockQ8K;
 
-    fn to_float(xs: &[Self], ys: &mut [f32]) -> Result<()> {
+    fn to_float(xs: &[Self], mut ys: &mut [f32]) -> Result<()> {
         let k = ys.len();
         if k % QK_K != 0 {
             crate::bail!("dequantis block iq4xs {k} is not divisible by {QK_K}");
@@ -44,48 +44,29 @@ impl GgmlType for BlockIQ4xs {
             let block = &xs[i];
 
             let d = block.d.to_f32();
-            let qs = &block.qs;
+            let mut qs = &block.qs[..];
 
-            let mut qs_offset = 0;
-
-            // A pointer (offset) into out_chunk:
-            let mut y_offset = 0;
-
-            // 2. For each sub-block of size 32:
-            //    QK_K/32 sub-blocks, each sub-block contributes 32 floats of output.
             for ib in 0..(QK_K / 32) {
-                // 2a. Reconstruct `ls` from scales_l/scales_h:
-                //    This matches the C code:
-                //    ls = ((scales_l[ib/2] >> (4*(ib%2))) & 0xf)
-                //         | (((scales_h >> (2*ib)) & 3) << 4);
                 let ib_div_2 = ib / 2;
                 let ib_mod_2 = ib % 2;
 
                 let ls_low = (block.scales_l[ib_div_2] >> (4 * ib_mod_2)) & 0xF;
                 let ls_high = ((block.scales_h >> (2 * ib)) & 0x3) << 4;
-                let ls = (ls_low as u16 | ls_high) as i32; // range [0..63]
+                let ls = (ls_low as u16 | ls_high) as i32;
 
-                // 2b. Compute the scale for this sub-block
-                //     In the C code: float dl = d * (ls - 32).
                 let dl = d * ((ls - 32) as f32);
 
-                // 2c. Now fill 32 floats of output by reading 16 bytes from qs.
-                //     Each byte in qs has two 4-bit indices: low nibble, high nibble.
-                //     So we do 16 times:
-                //       y[j+0]  = dl * kvalues_iq4nl[ qs[j] & 0xF ];
-                //       y[j+16] = dl * kvalues_iq4nl[ qs[j] >> 4 ];
                 for j in 0..16 {
-                    let byte_val = qs[qs_offset + j];
-                    let idx0 = (byte_val & 0xF) as usize; // low nibble
-                    let idx1 = (byte_val >> 4) as usize; // high nibble
+                    let byte_val = qs[j];
+                    let idx0 = (byte_val & 0xF) as usize;
+                    let idx1 = (byte_val >> 4) as usize;
 
-                    ys[y_offset + j] = dl * KVALUES_IQ4NL[idx0] as f32;
-                    ys[y_offset + j + 16] = dl * KVALUES_IQ4NL[idx1] as f32;
+                    ys[j] = dl * KVALUES_IQ4NL[idx0] as f32;
+                    ys[j + 16] = dl * KVALUES_IQ4NL[idx1] as f32;
                 }
 
-                // Advance by 16 bytes in qs, 32 floats in y
-                qs_offset += 16;
-                y_offset += 32;
+                qs = &qs[16..];
+                ys = &mut ys[32..];
             }
         }
         Ok(())

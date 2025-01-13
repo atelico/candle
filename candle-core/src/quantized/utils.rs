@@ -582,8 +582,8 @@ fn best_index_int8(n: usize, val: &[i8], x: f32) -> usize {
             ml = mav;
         }
     }
-    let dist_low = (x - val[mu - 1] as f32).abs();
-    let dist_high = (val[mu] as f32 - x).abs();
+    let dist_low = x - val[mu - 1] as f32;
+    let dist_high = val[mu] as f32 - x;
     if dist_low < dist_high {
         mu - 1
     } else {
@@ -668,7 +668,7 @@ pub(super) fn quantize_iq4_nl(
         // 7. do the initial d = ±(max/values[0]) (depending on ntry>0)
         let sign = if ntry > 0 { -1.0 } else { 1.0 };
         let mut d = sign * (max / (values[0] as f32));
-        let id = 1.0 / d;
+        let mut id = 1.0 / d;
         let mut sumqx = 0.0f32;
         let mut sumq2 = 0.0f32;
 
@@ -692,24 +692,20 @@ pub(super) fn quantize_iq4_nl(
         for itry in -ntry..=ntry {
             let itryf = itry as f32;
             // id = (itry + values[0]) / max (from the code)
-            let attempt_id = (itryf + values[0] as f32) / max;
-            let mut attempt_sumqx = 0.0f32;
-            let mut attempt_sumq2 = 0.0f32;
+            id = (itryf + values[0] as f32) / max;
+            sumqx = 0.0f32;
+            sumq2 = 0.0f32;
             for j in 0..block_size {
-                let al = attempt_id * xb[j];
+                let al = id * xb[j];
                 let l = best_index_int8(16, &values, al);
                 let q = values[l] as f32;
                 let w = weight[j];
-                attempt_sumqx += w * q * xb[j];
-                attempt_sumq2 += w * q * q;
+                sumqx += w * q * xb[j];
+                sumq2 += w * q * q;
             }
-            if attempt_sumq2 > 0.0 {
-                let candidate_d = attempt_sumqx / attempt_sumq2;
-                let candidate_val = candidate_d * attempt_sumqx;
-                if candidate_val * candidate_val > best * attempt_sumq2 {
-                    d = candidate_d;
-                    best = candidate_val;
-                }
+            if sumq2 > 0. && sumqx * sumqx > best * sumq2 {
+                d = sumqx / sumq2;
+                best = d * sumqx;
             }
         }
 
@@ -756,9 +752,9 @@ pub(super) fn quantize_iq4_nl(
             }
 
             // pack l into scales_h/l
-            let l_packed = (l + 32) as u8; // shift from [-32..31] to [0..63]
-            let l_l = l_packed & 0xF;
-            let l_h = l_packed >> 4;
+            l += 32; // shift from [-32..31] to [0..63]
+            let l_l = (l & 0xF) as u8;
+            let l_h = (l >> 4) as u8;
 
             // store into block_out.scales_l[ib/2], block_out.scales_h[ib/8]
             if ib % 2 == 0 {
@@ -766,7 +762,7 @@ pub(super) fn quantize_iq4_nl(
             } else {
                 scales_l[ib / 2] |= l_l << 4;
             }
-            scales_h[ib / 8] |= (l_h as u16) << (2 * (ib as u16 % 8)) ;
+            scales_h[ib / 8] |= (l_h as u16) << (2 * (ib as u16 % 8));
         }
     } else {
         // super_block_size/block_size <= 1
