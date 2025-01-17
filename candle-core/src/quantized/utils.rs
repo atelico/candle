@@ -592,7 +592,7 @@ fn best_index_int8(n: usize, val: &[i8], x: f32) -> usize {
 }
 
 #[allow(non_snake_case)]
-pub(super) fn quantize_iq4_nl(
+pub(super) fn quantize_row_iq4_nl(
     xs_block: &[f32],
     super_block_size: usize,
     block_size: usize,
@@ -676,16 +676,14 @@ pub(super) fn quantize_iq4_nl(
         for j in 0..block_size {
             let al = id * xb[j];
             let l = best_index_int8(16, &values, al);
+            Lb[j] = l as u8;
             let q = values[l] as f32;
             let w = weight[j];
             sumqx += w * q * xb[j];
             sumq2 += w * q * q;
-            Lb[j] = l as u8;
         }
         // 7b. refine d => sumqx / sumq2
-        if sumq2 != 0.0 {
-            d = sumqx / sumq2;
-        }
+        d = sumqx / sumq2;
         let mut best = d * sumqx;
 
         // 8. search in range -ntry..ntry

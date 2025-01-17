@@ -1,7 +1,7 @@
 use half::f16;
 
 use crate::{
-    quantized::utils::{group_for_quantization, quantize_iq4_nl},
+    quantized::utils::{group_for_quantization, quantize_row_iq4_nl},
     Result,
 };
 
@@ -36,7 +36,7 @@ impl GgmlType for BlockIQ4xs {
     fn to_float(xs: &[Self], mut ys: &mut [f32]) -> Result<()> {
         let k = ys.len();
         if k % QK_K != 0 {
-            crate::bail!("dequantis block iq4xs {k} is not divisible by {QK_K}");
+            crate::bail!("dequantize block iq4xs {k} is not divisible by {QK_K}");
         }
 
         let nb = k / QK_K;
@@ -50,19 +50,15 @@ impl GgmlType for BlockIQ4xs {
                 let ib_div_2 = ib / 2;
                 let ib_mod_2 = ib % 2;
 
-                let ls_low = (block.scales_l[ib_div_2] >> (4 * ib_mod_2)) & 0xF;
-                let ls_high = ((block.scales_h >> (2 * ib)) & 0x3) << 4;
-                let ls = (ls_low as u16 | ls_high) as i32;
+                let ls_low = (block.scales_l[ib_div_2] as i32 >> (4 * ib_mod_2 as i32)) & 0xF;
+                let ls_high = ((block.scales_h as i32 >> (2 * ib as i32)) & 3) << 4;
+                let ls = ls_low | ls_high;
 
-                let dl = d * ((ls - 32) as f32);
+                let dl = d * (ls as f32 - 32.);
 
                 for j in 0..16 {
-                    let byte_val = qs[j];
-                    let idx0 = (byte_val & 0xF) as usize;
-                    let idx1 = (byte_val >> 4) as usize;
-
-                    ys[j] = dl * KVALUES_IQ4NL[idx0] as f32;
-                    ys[j + 16] = dl * KVALUES_IQ4NL[idx1] as f32;
+                    ys[j] = dl * KVALUES_IQ4NL[(qs[j] & 0xF) as usize] as f32;
+                    ys[j + 16] = dl * KVALUES_IQ4NL[(qs[j] >> 4) as usize] as f32;
                 }
 
                 qs = &qs[16..];
@@ -90,20 +86,43 @@ impl GgmlType for BlockIQ4xs {
         const BLOCK_SIZE: usize = 32;
         const NTRY: i32 = 7;
 
-        for (ys_block, xs_block) in group_for_quantization(xs, ys)? {
-            quantize_iq4_nl(
-                xs_block,
-                SUPER_BLOCK_SIZE,
-                BLOCK_SIZE,
-                &mut ys_block.d,
-                &mut ys_block.qs,
-                &mut [ys_block.scales_h],
-                &mut ys_block.scales_l,
-                &KVALUES_IQ4NL,
-                None,
-                NTRY,
-            );
+        let nrow = 1;
+        let n_per_row = 256;
+        let nblock = n_per_row / QK_K;
+
+        for row in 0..nrow {
+            let ys_block = &mut ys[nblock * row];
+            for ibl in 0..nblock {
+                let xs_block = &xs[n_per_row * row + QK_K * ibl..];
+                quantize_row_iq4_nl(
+                    xs_block,
+                    SUPER_BLOCK_SIZE,
+                    BLOCK_SIZE,
+                    &mut ys_block.d,
+                    &mut ys_block.qs,
+                    &mut [ys_block.scales_h],
+                    &mut ys_block.scales_l,
+                    &KVALUES_IQ4NL,
+                    None,
+                    NTRY,
+                );
+            }
         }
+
+        // for (ys_block, xs_block) in group_for_quantization(xs, ys)? {
+        //     quantize_row_iq4_nl(
+        //         xs_block,
+        //         SUPER_BLOCK_SIZE,
+        //         BLOCK_SIZE,
+        //         &mut ys_block.d,
+        //         &mut ys_block.qs,
+        //         &mut [ys_block.scales_h],
+        //         &mut ys_block.scales_l,
+        //         &KVALUES_IQ4NL,
+        //         None,
+        //         NTRY,
+        //     );
+        // }
         Ok(())
     }
 

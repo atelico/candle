@@ -996,9 +996,15 @@ fn quantize_iq4_xs(device: &Device) -> Result<()> {
     // ggml_quantization_error_test(dtype, device, GGML_MAX_QUANTIZATION_TOTAL_ERROR)?;
 
     let dtype = GgmlDType::IQ4_XS;
-    let tgt = Tensor::from_vec(
-        (1..=256).map(|x| 1. / x as f32).collect(),
-        (256,),
+    // let tgt = Tensor::from_vec(
+    //     (1..=256).map(|x| 1. / x as f32).collect(),
+    //     (256,),
+    //     &Device::Cpu,
+    // )?;
+    let tgt = Tensor::randn(
+        0f32,
+        1f32,
+        256,
         &Device::Cpu,
     )?;
     let q = quantized::QTensor::quantize(&tgt, dtype)?;
@@ -1006,6 +1012,9 @@ fn quantize_iq4_xs(device: &Device) -> Result<()> {
 
     println!("tgt {}", tgt.narrow(0, 0, 10)?);
     println!("res {}", res.narrow(0, 0, 10)?);
+
+    let diff = (tgt - res)?.abs()?.sum_all()?.to_scalar::<f32>()?;
+    dbg!(&diff);
     Ok(())
 }
 
