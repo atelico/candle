@@ -1001,12 +1001,7 @@ fn quantize_iq4_xs(device: &Device) -> Result<()> {
     //     (256,),
     //     &Device::Cpu,
     // )?;
-    let tgt = Tensor::randn(
-        0f32,
-        1f32,
-        256,
-        &Device::Cpu,
-    )?;
+    let tgt = Tensor::randn(0f32, 1f32, 256, &Device::Cpu)?;
     let q = quantized::QTensor::quantize(&tgt, dtype)?;
     let res = q.dequantize(&Device::Cpu)?;
 
