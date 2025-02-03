@@ -632,9 +632,11 @@ pub(crate) fn vec_dot_iq4_xs_q8k(n: usize, xs: &[BlockIQ4xs], ys: &[BlockQ8K]) -
 
         let nb = n / QK_K;
         for ibl in 0..nb {
-            let mut q8 = ys[ibl].qs.as_ptr();
-            let mut q4 = xs[ibl].qs.as_ptr();
-            let mut h = xs[ibl].scales_h;
+            let y_block = &ys[ibl];
+            let x_block = &xs[ibl];
+            let mut q8 = y_block.qs.as_ptr();
+            let mut q4 = x_block.qs.as_ptr();
+            let mut h = x_block.scales_h;
 
             let mut sumi1 = 0;
             let mut sumi2 = 0;
@@ -652,8 +654,8 @@ pub(crate) fn vec_dot_iq4_xs_q8k(n: usize, xs: &[BlockIQ4xs], ys: &[BlockQ8K]) -
                 let prod1 = vaddq_s32(vdotq_s32(q4b.0, q8b.0), vdotq_s32(q4b.1, q8b.1));
                 let prod2 = vaddq_s32(vdotq_s32(q4b.2, q8b.2), vdotq_s32(q4b.3, q8b.3));
 
-                let ls1 = (xs[ibl].scales_l[ib] & 0xf) as i32 | ((h << 4) & 0x30) as i32 - 32;
-                let ls2 = (xs[ibl].scales_l[ib] >> 4) as i32 | ((h << 2) & 0x30) as i32 - 32;
+                let ls1 = (x_block.scales_l[ib] & 0xf) as i32 | ((h << 4) & 0x30) as i32 - 32;
+                let ls2 = (x_block.scales_l[ib] >> 4) as i32 | ((h << 2) & 0x30) as i32 - 32;
                 h = h >> 4;
 
                 sumi1 += vaddvq_s32(prod1) * ls1;
