@@ -17,7 +17,11 @@ const CONV: &str = include_str!("conv.metal");
 const FILL: &str = include_str!("fill.metal");
 const INDEXING: &str = include_str!("indexing.metal");
 // Current source: https://github.com/ivarflakstad/metal-flash-attention/tree/candle
+#[cfg(not(target_os = "ios"))]
 const MFA: &[u8] = include_bytes!("libMetalFlashAttention.metallib");
+// Current source: https://github.com/philipturner/metal-flash-attention/releases/tag/v1.0.1
+#[cfg(target_os = "ios")]
+const MFA: &[u8] = include_bytes!("libMetalFlashAttention.ios.metallib");
 const MLX_GEMM: &str = include_str!("mlx_gemm.metal");
 const QUANTIZED: &str = include_str!("quantized.metal");
 const RANDOM: &str = include_str!("random.metal");
@@ -738,6 +742,7 @@ pub fn call_last_attn_softmax(
     mask: &Buffer,
     mask_offset: usize,
     input_shape: &[usize],
+    mask_shape: &[usize],
     scale: f32,
     ty: SdpaDType,
     output: &Buffer,
@@ -748,6 +753,14 @@ pub fn call_last_attn_softmax(
     let ne01 = input_shape[input_shape.len() - 2] as i64;
     let ne02 = input_shape[input_shape.len() - 3] as i64;
     let ne03 = input_shape[input_shape.len() - 4] as i64;
+
+    let elem_per_batch = if mask_shape.len() == 2 {
+        0
+    } else {
+        let bs = input_shape[0];
+        let el: usize = input_shape.iter().product();
+        el / bs
+    };
 
     let mut nth = 32; // SIMD width
     let name = if ne00 % 4 == 0 {
@@ -784,6 +797,7 @@ pub fn call_last_attn_softmax(
             ne00,
             ne01,
             ne02,
+            elem_per_batch as i64,
             scale
         )
     );
@@ -2003,7 +2017,12 @@ pub fn call_sdpa_vector(
         alpha
     };
 
-    let pipeline = kernels.load_pipeline(device, Source::Sdpa, &name)?;
+    let constants = Some(ConstantValues::new(vec![(
+        20,
+        Value::Bool(/* sdpa_vector_has_mask */ false),
+    )]));
+
+    let pipeline = kernels.load_pipeline_with_constants(device, Source::Sdpa, &name, constants)?;
     let encoder = ep.encoder();
     let encoder: &ComputeCommandEncoderRef = encoder.as_ref();
     encoder.set_compute_pipeline_state(&pipeline);
@@ -2115,7 +2134,13 @@ pub fn call_sdpa_vector_2pass(
             alpha
         };
 
-        let pipeline = kernels.load_pipeline(device, Source::Sdpa, &name_pass1)?;
+        let constants = Some(ConstantValues::new(vec![(
+            20,
+            Value::Bool(/* sdpa_vector_has_mask */ false),
+        )]));
+
+        let pipeline =
+            kernels.load_pipeline_with_constants(device, Source::Sdpa, &name_pass1, constants)?;
         let encoder = ep.encoder();
         let encoder: &ComputeCommandEncoderRef = encoder.as_ref();
         encoder.set_compute_pipeline_state(&pipeline);
