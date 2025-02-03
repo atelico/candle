@@ -9,7 +9,7 @@ use super::{BlockQ8K, GgmlDType, GgmlType, QK_K};
 
 pub const QK4_NL: usize = 32;
 
-const KVALUES_IQ4NL: [i8; 16] = [
+pub(super) const KVALUES_IQ4NL: [i8; 16] = [
     -127, -104, -83, -65, -49, -35, -22, -10, 1, 13, 25, 38, 53, 69, 89, 113,
 ];
 
@@ -98,11 +98,86 @@ impl GgmlType for BlockIQ4xs {
 
     #[allow(unreachable_code)]
     fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
-        todo!()
+        // #[cfg(target_feature = "avx")]
+        // todo!();
+
+        #[cfg(target_feature = "neon")]
+        return super::neon::vec_dot_iq4_xs_q8k(n, xs, ys);
+
+        Self::vec_dot_unopt(n, xs, ys)
     }
 
     fn vec_dot_unopt(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
-        todo!()
+        if n % QK_K != 0 {
+            bail!("n must be a multiple of QK_K");
+        }
+        let nb = n / QK_K;
+
+        let mut sumf = 0.0f32;
+
+        // Loop over each block
+        for ibl in 0..nb {
+            // x[ibl], y[ibl]
+            let x = &xs[ibl];
+            let y = &ys[ibl];
+
+            // Convert x.d from fp16 to fp32, then multiply by y.d
+            let d4d8 = x.d.to_f32() * y.d;
+
+            // We'll track the "h" scales
+            let mut h = x.scales_h;
+
+            let mut qsi = 0; // index for x.qs
+            let mut q8i = 0; // index for y.qs
+
+            // so we step by 2 in Rust as well
+            for ib2 in (0..(QK_K / 32)).step_by(2) {
+                // Reproduce the logic of ls1, ls2
+                let ls1 = (x.scales_l[ib2 / 2] & 0x0f) | (((h << 4) & 0x30) as u8);
+                let ls2 = (x.scales_l[ib2 / 2] >> 4) | (((h << 2) & 0x30) as u8);
+                // Then we shift h by 4 in the original code
+                h >>= 4;
+
+                // Convert ls1, ls2 to "scaled" floats
+                let d1 = d4d8 * ((ls1 as i32) - 32) as f32;
+                let d2 = d4d8 * ((ls2 as i32) - 32) as f32;
+
+                // Two sets of 16 items each
+                // sum of the first 16-lane block
+                let mut sumi1 = 0;
+                let mut sumi2 = 0;
+
+                // The first pass
+                for j in 0..16 {
+                    // q8i + j   vs q8i + j + 16
+                    // qs[qsi + j] & 0xf vs (qs[qsi + j] >> 4)
+                    sumi1 += (y.qs[q8i + j] as i32)
+                        * KVALUES_IQ4NL[(x.qs[qsi + j] & 0x0f) as usize] as i32;
+                    sumi2 += (y.qs[q8i + j + 16] as i32)
+                        * KVALUES_IQ4NL[((x.qs[qsi + j] >> 4) & 0x0f) as usize] as i32;
+                }
+                sumf += d1 * ((sumi1 + sumi2) as f32);
+
+                qsi += 16;
+                q8i += 32;
+
+                // The second pass
+                sumi1 = 0;
+                sumi2 = 0;
+                for j in 0..16 {
+                    sumi1 += (y.qs[q8i + j] as i32)
+                        * KVALUES_IQ4NL[(x.qs[qsi + j] & 0x0f) as usize] as i32;
+                    sumi2 += (y.qs[q8i + j + 16] as i32)
+                        * KVALUES_IQ4NL[((x.qs[qsi + j] >> 4) & 0x0f) as usize] as i32;
+                }
+                sumf += d2 * ((sumi1 + sumi2) as f32);
+
+                qsi += 16;
+                q8i += 32;
+            }
+        }
+
+        Ok(sumf)
     }
 }
 
@@ -113,7 +188,6 @@ fn quantize_iq4_xs(
     n_per_row: usize,
     quant_weights: Option<&[f32]>,
 ) -> Result<()> {
-    // Basic sanity checks, similar to the C macro GGML_ASSERT
     if n_per_row % QK_K != 0 {
         bail!("n_per_row must be multiple of QK_K = {}", QK_K);
     }
@@ -128,7 +202,6 @@ fn quantize_iq4_xs(
         );
     }
 
-    // We'll need some local buffers that match the usage in the C code
     let mut lbuf = vec![0u8; QK_K]; // L[QK_K]
     let mut weight = vec![0f32; 32]; // weight[32] (the block_size is 32)
     let mut scales = vec![0f32; QK_K / 32]; // scales[QK_K/32], e.g. 256/32=8
@@ -139,10 +212,8 @@ fn quantize_iq4_xs(
     for _row in 0..nrow {
         // Each row has `nblock` blocks:
         for ibl in 0..nblock {
-            // In C:  block_iq4_xs * iq4 = (block_iq4_xs *)qrow;
             let block = &mut ys[dst_offset + ibl];
 
-            // quant_weights?
             let qw = quant_weights.map(|qw_all| {
                 let start = QK_K * ibl;
                 &qw_all[start..start + QK_K]
@@ -202,8 +273,6 @@ pub fn quantize_iq4_xs_imatrix(
 
     // 4. Outer loop over rows
     for _row in 0..nrow {
-        // In C: block_iq4_xs * iq4 = (block_iq4_xs *)qrow;
-        // Here: let block_slice = &mut dst[dst_offset..dst_offset + nblock];
         for ibl in 0..nblock {
             let block = &mut dst[dst_offset + ibl];
 
