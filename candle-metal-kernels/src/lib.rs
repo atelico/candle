@@ -17,11 +17,7 @@ const CONV: &str = include_str!("conv.metal");
 const FILL: &str = include_str!("fill.metal");
 const INDEXING: &str = include_str!("indexing.metal");
 // Current source: https://github.com/ivarflakstad/metal-flash-attention/tree/candle
-#[cfg(not(target_os = "ios"))]
 const MFA: &[u8] = include_bytes!("libMetalFlashAttention.metallib");
-// Current source: https://github.com/philipturner/metal-flash-attention/releases/tag/v1.0.1
-#[cfg(target_os = "ios")]
-const MFA: &[u8] = include_bytes!("libMetalFlashAttention.ios.metallib");
 const MLX_GEMM: &str = include_str!("mlx_gemm.metal");
 const QUANTIZED: &str = include_str!("quantized.metal");
 const RANDOM: &str = include_str!("random.metal");
@@ -2017,12 +2013,7 @@ pub fn call_sdpa_vector(
         alpha
     };
 
-    let constants = Some(ConstantValues::new(vec![(
-        20,
-        Value::Bool(/* sdpa_vector_has_mask */ false),
-    )]));
-
-    let pipeline = kernels.load_pipeline_with_constants(device, Source::Sdpa, &name, constants)?;
+    let pipeline = kernels.load_pipeline(device, Source::Sdpa, &name)?;
     let encoder = ep.encoder();
     let encoder: &ComputeCommandEncoderRef = encoder.as_ref();
     encoder.set_compute_pipeline_state(&pipeline);
@@ -2134,13 +2125,7 @@ pub fn call_sdpa_vector_2pass(
             alpha
         };
 
-        let constants = Some(ConstantValues::new(vec![(
-            20,
-            Value::Bool(/* sdpa_vector_has_mask */ false),
-        )]));
-
-        let pipeline =
-            kernels.load_pipeline_with_constants(device, Source::Sdpa, &name_pass1, constants)?;
+        let pipeline = kernels.load_pipeline(device, Source::Sdpa, &name_pass1)?;
         let encoder = ep.encoder();
         let encoder: &ComputeCommandEncoderRef = encoder.as_ref();
         encoder.set_compute_pipeline_state(&pipeline);
