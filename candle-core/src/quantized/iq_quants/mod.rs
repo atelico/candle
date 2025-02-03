@@ -40,9 +40,7 @@ impl GgmlType for BlockIQ4xs {
         }
 
         let nb = k / QK_K;
-        for i in 0..nb {
-            let block = &xs[i];
-
+        for block in xs.iter().take(nb) {
             let d = block.d.to_f32();
             let mut qs = &block.qs[..];
 

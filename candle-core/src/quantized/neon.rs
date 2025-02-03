@@ -656,7 +656,7 @@ pub(crate) fn vec_dot_iq4_xs_q8k(n: usize, xs: &[BlockIQ4xs], ys: &[BlockQ8K]) -
 
                 let ls1 = (x_block.scales_l[ib] & 0xf) as i32 | ((h << 4) & 0x30) as i32 - 32;
                 let ls2 = (x_block.scales_l[ib] >> 4) as i32 | ((h << 2) & 0x30) as i32 - 32;
-                h = h >> 4;
+                h >>= 4;
 
                 sumi1 += vaddvq_s32(prod1) * ls1;
                 sumi2 += vaddvq_s32(prod2) * ls2;

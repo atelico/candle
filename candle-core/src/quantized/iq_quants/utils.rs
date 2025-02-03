@@ -30,8 +30,8 @@ pub(super) fn quantize_row_iq4_nl_impl(
 
     // 1. compute sigma2
     let mut sigma2 = 0f32;
-    for j in 0..super_block_size {
-        sigma2 += x[j] * x[j];
+    for x in x.iter().take(super_block_size) {
+        sigma2 += x * x;
     }
     sigma2 *= 2.0 / (super_block_size as f32);
 
@@ -155,12 +155,7 @@ pub(super) fn quantize_row_iq4_nl_impl(
         for ib in 0..nblocks {
             // l = nearest_int(id * scales[ib]), clamp to [-32..31]
             let mut l = (id * scales[ib]).round() as i32;
-            if l < -32 {
-                l = -32;
-            }
-            if l > 31 {
-                l = 31;
-            }
+            l = l.clamp(-32, 31);
 
             // refine block
             let dl = d * (l as f32);
