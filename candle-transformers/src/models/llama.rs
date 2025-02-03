@@ -1,5 +1,8 @@
 use super::with_tracing::{linear_no_bias as linear, Linear, RmsNorm};
-use candle::{DType, Device, IndexOp, Result, Tensor, D};
+use candle::{
+    quantized::{GgmlDType, QTensor},
+    DType, Device, IndexOp, Result, Tensor, D,
+};
 use candle_nn::{embedding, Embedding, Module, VarBuilder};
 use std::{collections::HashMap, f32::consts::PI};
 
@@ -275,6 +278,16 @@ impl CausalSelfAttention {
         let q = self.q_proj.forward(x)?;
         let k = self.k_proj.forward(x)?;
         let v = self.v_proj.forward(x)?;
+
+        let q = QTensor::quantize(&q, GgmlDType::Iq4Xs)?
+            .dequantize(q.device())?
+            .to_dtype(q.dtype())?;
+        let k = QTensor::quantize(&k, GgmlDType::Iq4Xs)?
+            .dequantize(q.device())?
+            .to_dtype(q.dtype())?;
+        let v = QTensor::quantize(&v, GgmlDType::Iq4Xs)?
+            .dequantize(q.device())?
+            .to_dtype(q.dtype())?;
 
         let q = q
             .reshape((b_sz, seq_len, self.num_attention_heads, self.head_dim))?

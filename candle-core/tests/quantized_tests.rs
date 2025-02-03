@@ -1,6 +1,6 @@
 use candle_core::{
     bail,
-    quantized::{self, GgmlDType},
+    quantized::{self, quants, GgmlDType},
     test_device,
     test_utils::to_vec2_round,
     DType, Device, IndexOp, Module, Result, Tensor, Var,
@@ -90,7 +90,7 @@ fn quantized_matmul(device: &Device) -> Result<()> {
     let mut rhs_t = vec![k_quants::BlockQ4_0::zeros(); 8];
     let rhs = (0..(k * n)).map(|v| v as f32).collect::<Vec<_>>();
     k_quants::BlockQ4_0::from_float(&rhs, &mut rhs_t)?;
-    k_quants::matmul((m, k, n), &lhs_s, &rhs_t, &mut dst)?;
+    quants::matmul((m, k, n), &lhs_s, &rhs_t, &mut dst)?;
     assert_eq!(
         dst.iter().map(|x| x.round()).collect::<Vec<_>>(),
         &[
@@ -155,7 +155,7 @@ fn quantized_matmul_neg(device: &Device) -> Result<()> {
         .collect::<Vec<_>>();
     let tensor_rhs = Tensor::from_slice(&rhs, (n, k), device)?.t()?;
     k_quants::BlockQ4_0::from_float(&rhs, &mut rhs_t)?;
-    k_quants::matmul((m, k, n), &lhs_s, &rhs_t, &mut dst)?;
+    quants::matmul((m, k, n), &lhs_s, &rhs_t, &mut dst)?;
     assert_eq!(
         dst.iter().map(|x| x.round()).collect::<Vec<_>>(),
         &[
@@ -950,66 +950,84 @@ fn quantize_q8k(device: &Device) -> Result<()> {
 }
 
 fn quantize_iq4_xs(device: &Device) -> Result<()> {
-    // let dtype = GgmlDType::IQ4_XS;
-    // let src = get_test_vector2(0.5, 256, device)?;
-    // let quant = quantized::QTensor::quantize(&src, dtype)?;
-    // let dst = quant.dequantize(device)?;
-    // let dst_f16 = quant.dequantize_f16(device)?;
-    // let diff = (dst.to_dtype(DType::F16)? - dst_f16)?
-    //     .to_dtype(DType::F32)?
-    //     .abs()?
-    //     .sum_all()?
-    //     .to_vec0::<f32>()?;
-    // assert_eq!(diff, 0.);
+    let dtype = GgmlDType::Iq4Xs;
+    let src = get_test_vector2(0.5, 1024, device)?;
+    let quant = quantized::QTensor::quantize(&src, dtype)?;
+    let dst = quant.dequantize(device)?;
+    let dst_f16 = quant.dequantize_f16(device)?;
+    let diff = (dst.to_dtype(DType::F16)? - dst_f16)?
+        .to_dtype(DType::F32)?
+        .abs()?
+        .sum_all()?
+        .to_vec0::<f32>()?;
+    assert_eq!(diff, 0.);
 
-    // let src = src.to_vec1::<f32>()?;
-    // let dst = dst.to_vec1::<f32>()?;
-    // dbg!(&src[10 * 10..(10 + 1) * 10], &dst[10 * 10..(10 + 1) * 10]);
-    // compare_with_error(dst.as_slice(), src.as_slice(), 0.017);
+    let src = src.to_vec1::<f32>()?;
+    let dst = dst.to_vec1::<f32>()?;
+    compare_with_error(dst.as_slice(), src.as_slice(), 0.025);
 
-    // // Test some specific values
-    // assert_eq!(
-    //     [src[0], src[128], src[256], src[512], src[800], src[1023]],
-    //     [-0.5, -0.375, -0.25, 0.0, 0.28125, 0.49902344]
-    // );
-    // let dst = round_vector(&dst);
-    // assert_eq!(
-    //     [dst[0], dst[128], dst[256], dst[512], dst[800], dst[1023]],
-    //     [-0.5, -0.373, -0.25, 0.0, 0.288, 0.498]
-    // );
+    let src_big = get_test_vector2(128.0, 1024, device)?;
+    let quant_big = quantized::QTensor::quantize(&src_big, dtype)?;
+    let dst_big = quant_big.dequantize(device)?;
+    let dst_big_f16 = quant_big.dequantize_f16(device)?;
+    let diff = (dst_big.to_dtype(DType::F16)? - dst_big_f16)?
+        .to_dtype(DType::F32)?
+        .abs()?
+        .sum_all()?
+        .to_vec0::<f32>()?;
+    assert_eq!(diff, 0.);
 
-    // let src_big = get_test_vector2(128.0, 1024, device)?;
-    // let quant_big = quantized::QTensor::quantize(&src_big, dtype)?;
-    // let dst_big = quant_big.dequantize(device)?;
-    // let dst_big_f16 = quant_big.dequantize_f16(device)?;
-    // let diff = (dst_big.to_dtype(DType::F16)? - dst_big_f16)?
-    //     .to_dtype(DType::F32)?
-    //     .abs()?
-    //     .sum_all()?
-    //     .to_vec0::<f32>()?;
-    // assert_eq!(diff, 0.);
+    let src_big = src_big.to_vec1::<f32>()?;
+    let dst_big = dst_big.to_vec1::<f32>()?;
+    compare_with_error(dst_big.as_slice(), src_big.as_slice(), 5.9);
 
-    // let src_big = src_big.to_vec1::<f32>()?;
-    // let dst_big = dst_big.to_vec1::<f32>()?;
-    // compare_with_error(dst_big.as_slice(), src_big.as_slice(), 4.5);
+    ggml_quantization_error_test(dtype, device, GGML_MAX_QUANTIZATION_TOTAL_ERROR)?;
 
-    // ggml_quantization_error_test(dtype, device, GGML_MAX_QUANTIZATION_TOTAL_ERROR)?;
+    Ok(())
+}
 
-    let dtype = GgmlDType::IQ4_XS;
-    // let tgt = Tensor::from_vec(
-    //     (1..=256).map(|x| 1. / x as f32).collect(),
-    //     (256,),
-    //     &Device::Cpu,
-    // )?;
-    let tgt = Tensor::randn(0f32, 1f32, 256, &Device::Cpu)?;
-    let q = quantized::QTensor::quantize(&tgt, dtype)?;
-    let res = q.dequantize(&Device::Cpu)?;
+#[test]
+fn imatrix_quantize_iq4_xs() -> Result<()> {
+    // let data =
+    //     quantized::imatrix_file::load_imatrix("../Llama-3.2-3B-Instruct.imatrix").unwrap();
+    // for (name, weights) in &data {
+    //     println!("{name}, {} elems", weights.len());
+    // }
+    // dbg!(&data["blk.0.attn_q.weight"].len());
 
-    println!("tgt {}", tgt.narrow(0, 0, 10)?);
-    println!("res {}", res.narrow(0, 0, 10)?);
+    let cpu = &Device::Cpu;
 
-    let diff = (tgt - res)?.abs()?.sum_all()?.to_scalar::<f32>()?;
-    dbg!(&diff);
+    let mut row_counts = 0f64;
+    let mut ncall = 0f64;
+    let mut values = Tensor::zeros((768,), DType::F32, cpu)?;
+
+    for _ in 0..10 {
+        let lhs = Var::from_tensor(&Tensor::randn(0f32, 1f32, (1024, 512), cpu)?)?;
+        let rhs = Var::from_tensor(&Tensor::randn(0f32, 1f32, (512, 768), cpu)?)?;
+        let res = lhs.matmul(&rhs)?;
+
+        // https://github.com/ggerganov/llama.cpp/blob/678d7994f4da0af3d29046be99950ac999ee9762/examples/imatrix/imatrix.cpp#L180-L186
+        values = (values + res.sqr()?.sum(0)?)?;
+        row_counts += res.dim(0)? as f64;
+        ncall += 1.;
+    }
+
+    // https://github.com/ggerganov/llama.cpp/blob/678d7994f4da0af3d29046be99950ac999ee9762/examples/imatrix/imatrix.cpp#L275
+    let out = ((values / row_counts)? * ncall)?;
+    let imatrix = out.to_vec1::<f32>()?;
+
+    let xs = Tensor::randn(0f32, 1f32, (1024, 768), cpu)?;
+
+    let quant1 = quantized::QTensor::quantize(&xs, GgmlDType::Iq4Xs)?;
+    let quant2 = quantized::QTensor::quantize_imatrix(&xs, &imatrix, GgmlDType::Iq4Xs)?;
+
+    let dequant1 = quant1.dequantize(cpu)?;
+    let dequant2 = quant2.dequantize(cpu)?;
+
+    let err1 = (dequant1 - &xs)?.abs()?.mean_all()?.to_scalar::<f32>()?;
+    let err2 = (dequant2 - &xs)?.abs()?.mean_all()?.to_scalar::<f32>()?;
+    assert!(err2 < err1, "err2 {err2} > err1 {err1}");
+
     Ok(())
 }
 

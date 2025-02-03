@@ -34,7 +34,7 @@ impl QMetalStorage {
     }
 
     pub fn dequantize(&self, elem_count: usize) -> Result<MetalStorage> {
-        use crate::quantized::k_quants::GgmlType;
+        use crate::quantized::quants::GgmlType;
 
         let buffer = self.device.new_buffer_managed(self.buffer.length())?;
         let command_buffer = self.device.command_buffer()?;
@@ -107,7 +107,7 @@ impl QMetalStorage {
                 let vec: Vec<crate::quantized::BlockQ8K> = read_to_vec(&buffer, block_len);
                 crate::quantized::BlockQ8K::to_float(&vec, &mut out)?;
             }
-            GgmlDType::IQ4_XS => {
+            GgmlDType::Iq4Xs => {
                 let vec: Vec<crate::quantized::BlockIQ4xs> = read_to_vec(&buffer, block_len);
                 crate::quantized::BlockIQ4xs::to_float(&vec, &mut out)?;
             }
@@ -391,7 +391,7 @@ impl From<GgmlDType> for candle_metal_kernels::GgmlDType {
             GgmlDType::Q5K => candle_metal_kernels::GgmlDType::Q5K,
             GgmlDType::Q6K => candle_metal_kernels::GgmlDType::Q6K,
             GgmlDType::Q8K => candle_metal_kernels::GgmlDType::Q8K,
-            GgmlDType::IQ4_XS => candle_metal_kernels::GgmlDType::Q8_0,
+            GgmlDType::Iq4Xs => candle_metal_kernels::GgmlDType::Q8_0,
             GgmlDType::F16 => candle_metal_kernels::GgmlDType::F16,
             GgmlDType::F32 => candle_metal_kernels::GgmlDType::F32,
             GgmlDType::BF16 => candle_metal_kernels::GgmlDType::F16,

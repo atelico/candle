@@ -14,6 +14,7 @@ pub mod iq_quants;
 pub mod k_quants;
 #[cfg(feature = "metal")]
 pub mod metal;
+pub mod quants;
 #[cfg(not(feature = "metal"))]
 mod metal {
     pub use super::dummy_metal::*;
@@ -29,10 +30,9 @@ mod cuda {
 pub mod neon;
 #[cfg(target_feature = "simd128")]
 pub mod simd128;
-pub mod utils;
 use half::{bf16, f16};
 
-pub use k_quants::GgmlType;
+pub use quants::GgmlType;
 
 pub struct QTensor {
     storage: QStorage,
@@ -202,7 +202,7 @@ pub enum GgmlDType {
     Q5K,
     Q6K,
     Q8K,
-    IQ4_XS,
+    Iq4Xs,
 }
 
 impl GgmlDType {
@@ -222,7 +222,7 @@ impl GgmlDType {
             13 => Self::Q5K,
             14 => Self::Q6K,
             15 => Self::Q8K,
-            23 => Self::IQ4_XS,
+            23 => Self::Iq4Xs,
             // https://github.com/ggerganov/ggml/blob/29d87fc6676e7ed0cdfdec0804b06001d9c2bb44/include/ggml.h#L389
             30 => Self::BF16,
             _ => crate::bail!("unknown dtype for tensor {u}"),
@@ -246,7 +246,7 @@ impl GgmlDType {
             Self::Q5K => 13,
             Self::Q6K => 14,
             Self::Q8K => 15,
-            Self::IQ4_XS => 23,
+            Self::Iq4Xs => 23,
             // https://github.com/ggerganov/ggml/blob/29d87fc6676e7ed0cdfdec0804b06001d9c2bb44/include/ggml.h#L389
             Self::BF16 => 30,
         }
@@ -269,7 +269,7 @@ impl GgmlDType {
             Self::Q5K => Box::new(vec![BlockQ5K::zeros(); elem_count / BlockQ5K::BLCK_SIZE]),
             Self::Q6K => Box::new(vec![BlockQ6K::zeros(); elem_count / BlockQ6K::BLCK_SIZE]),
             Self::Q8K => Box::new(vec![BlockQ8K::zeros(); elem_count / BlockQ8K::BLCK_SIZE]),
-            Self::IQ4_XS => Box::new(vec![
+            Self::Iq4Xs => Box::new(vec![
                 BlockIQ4xs::zeros();
                 elem_count / BlockIQ4xs::BLCK_SIZE
             ]),
@@ -295,7 +295,7 @@ impl GgmlDType {
             Self::Q5K => std::mem::size_of::<BlockQ5K>(),
             Self::Q6K => std::mem::size_of::<BlockQ6K>(),
             Self::Q8K => std::mem::size_of::<BlockQ8K>(),
-            Self::IQ4_XS => std::mem::size_of::<BlockIQ4xs>(),
+            Self::Iq4Xs => std::mem::size_of::<BlockIQ4xs>(),
         }
     }
 
@@ -310,13 +310,9 @@ impl GgmlDType {
             Self::Q5_1 => k_quants::QK5_1,
             Self::Q8_0 => k_quants::QK8_0,
             Self::Q8_1 => k_quants::QK8_1,
-            Self::Q2K
-            | Self::Q3K
-            | Self::Q4K
-            | Self::Q5K
-            | Self::Q6K
-            | Self::Q8K
-            | Self::IQ4_XS => k_quants::QK_K,
+            Self::Q2K | Self::Q3K | Self::Q4K | Self::Q5K | Self::Q6K | Self::Q8K | Self::Iq4Xs => {
+                k_quants::QK_K
+            }
         }
     }
 }
@@ -341,9 +337,9 @@ pub trait QuantizedType: Send + Sync {
     fn size(&self) -> usize;
 }
 
-impl<T: k_quants::GgmlType + Send + Sync> QuantizedType for Vec<T> {
+impl<T: quants::GgmlType + Send + Sync> QuantizedType for Vec<T> {
     fn matmul_t(&self, mkn: (usize, usize, usize), lhs: &[f32], dst: &mut [f32]) -> Result<()> {
-        k_quants::matmul(mkn, lhs, self.as_slice(), dst)
+        quants::matmul(mkn, lhs, self.as_slice(), dst)
     }
 
     fn size(&self) -> usize {

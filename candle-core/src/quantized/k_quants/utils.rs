@@ -1,8 +1,4 @@
-use half::f16;
-
 use crate::Result;
-
-const GROUP_MAX_EPS: f32 = 1e-15;
 
 pub(super) fn nearest_int(v: f32) -> i32 {
     v.round() as i32
@@ -11,7 +7,7 @@ pub(super) fn nearest_int(v: f32) -> i32 {
 /// Validates that the input and output are the right size and returns an iterator which maps each
 /// input region `xs` to its corresponding output block in `ys`. Each output region is guaranteed
 /// to be `T::BLCK_SIZE` long.
-pub(super) fn group_for_quantization<'a, 'b, T: super::k_quants::GgmlType>(
+pub(super) fn group_for_quantization<'a, 'b, T: super::GgmlType>(
     xs: &'b [f32],
     ys: &'a mut [T],
 ) -> Result<Vec<(&'a mut T, &'b [f32])>> {
@@ -32,7 +28,7 @@ pub(super) fn group_for_quantization<'a, 'b, T: super::k_quants::GgmlType>(
 /// Validates that the input and output are the right size and returns an iterator which maps each
 /// input block `xs` to its corresponding output region in `ys`. Each output region is guaranteed
 /// to be `T::BLCK_SIZE` long.
-pub(super) fn group_for_dequantization<'a, 'b, T: super::k_quants::GgmlType>(
+pub(super) fn group_for_dequantization<'a, 'b, T: super::GgmlType>(
     xs: &'a [T],
     ys: &'b mut [f32],
 ) -> Result<Vec<(&'a T, &'b mut [f32])>> {
@@ -563,198 +559,4 @@ pub(super) fn make_qp_quants(
     }
 
     sumlx / suml2
-}
-
-fn best_index_int8(n: usize, val: &[i8], x: f32) -> usize {
-    if x <= val[0] as f32 {
-        return 0;
-    }
-    if x >= val[n - 1] as f32 {
-        return n - 1;
-    }
-    let mut ml = 0_usize;
-    let mut mu = n - 1;
-    while mu - ml > 1 {
-        let mav = (ml + mu) / 2;
-        if x < val[mav] as f32 {
-            mu = mav;
-        } else {
-            ml = mav;
-        }
-    }
-    let dist_low = x - val[mu - 1] as f32;
-    let dist_high = val[mu] as f32 - x;
-    if dist_low < dist_high {
-        mu - 1
-    } else {
-        mu
-    }
-}
-
-#[allow(non_snake_case)]
-pub(super) fn quantize_row_iq4_nl(
-    xs_block: &[f32],
-    super_block_size: usize,
-    block_size: usize,
-    d: &mut f16,
-    qs: &mut [u8],
-    scales_h: &mut [u16],
-    scales_l: &mut [u8],
-    values: &[i8],
-    quant_weights: Option<&[f32]>,
-    ntry: i32,
-) {
-    let mut sigma2 = 0.0f32;
-    for &val in xs_block.iter() {
-        sigma2 += val * val;
-    }
-    sigma2 *= 2.0 / (super_block_size as f32);
-
-    qs.iter_mut().for_each(|x| *x = 0);
-
-    *d = f16::from_f32(0.);
-
-    let mut scales = vec![0.0f32; super_block_size / block_size];
-    let mut weight = vec![0.0f32; block_size];
-    let mut L = vec![0u8; super_block_size];
-
-    let mut max_scale = 0.0f32;
-    let mut amax_scale = 0.0f32;
-    let nb = super_block_size / block_size;
-
-    for ib in 0..nb {
-        let start = ib * block_size;
-        let end = start + block_size;
-        let xb = &xs_block[start..end];
-        let Lb = &mut L[start..end];
-
-        if let Some(qw) = quant_weights {
-            let qw_block = &qw[start..end];
-            for j in 0..block_size {
-                weight[j] = qw_block[j] * (sigma2 + xb[j] * xb[j]).sqrt();
-            }
-        } else {
-            for j in 0..block_size {
-                weight[j] = xb[j] * xb[j];
-            }
-        }
-
-        let mut amax = 0.0f32;
-        let mut max = 0.0f32;
-        for &v in xb.iter() {
-            let ax = v.abs();
-            if ax > amax {
-                amax = ax;
-                max = v;
-            }
-        }
-        if amax < GROUP_MAX_EPS {
-            scales[ib] = 0.0;
-            continue;
-        }
-
-        let sign = if ntry > 0 { -1.0 } else { 1.0 };
-        let mut d = sign * (max / (values[0] as f32));
-        let mut id = 1.0 / d;
-        let mut sumqx = 0.0f32;
-        let mut sumq2 = 0.0f32;
-
-        for j in 0..block_size {
-            let al = id * xb[j];
-            let l = best_index_int8(16, &values, al);
-            Lb[j] = l as u8;
-            let q = values[l] as f32;
-            let w = weight[j];
-            sumqx += w * q * xb[j];
-            sumq2 += w * q * q;
-        }
-        d = sumqx / sumq2;
-        let mut best = d * sumqx;
-
-        for itry in -ntry..=ntry {
-            let itryf = itry as f32;
-            id = (itryf + values[0] as f32) / max;
-            sumqx = 0.0f32;
-            sumq2 = 0.0f32;
-            for j in 0..block_size {
-                let al = id * xb[j];
-                let l = best_index_int8(16, &values, al);
-                let q = values[l] as f32;
-                let w = weight[j];
-                sumqx += w * q * xb[j];
-                sumq2 += w * q * q;
-            }
-            if sumq2 > 0. && sumqx * sumqx > best * sumq2 {
-                d = sumqx / sumq2;
-                best = d * sumqx;
-            }
-        }
-
-        scales[ib] = d;
-        let abs_d = d.abs();
-        if abs_d > amax_scale {
-            amax_scale = abs_d;
-            max_scale = d;
-        }
-    }
-
-    if nb > 1 {
-        let d_f32 = -max_scale / 32.0;
-        *d = f16::from_f32(d_f32);
-
-        let id = if d_f32 != 0.0 { 1.0 / d_f32 } else { 0.0 };
-
-        scales_h.iter_mut().for_each(|x| *x = 0);
-
-        for ib in 0..nb {
-            let mut l = nearest_int(id * scales[ib]);
-            l = l.clamp(-32, 31);
-
-            let dl = d_f32 * (l as f32);
-            let idl = if dl != 0.0 { 1.0 / dl } else { 0.0 };
-
-            let start = ib * block_size;
-            let end = start + block_size;
-            let xb = &xs_block[start..end];
-            let Lb = &mut L[start..end];
-
-            for j in 0..block_size {
-                let al = idl * xb[j];
-                let idx = best_index_int8(16, &values, al);
-                Lb[j] = idx as u8;
-            }
-
-            l += 32;
-            let l_l = (l & 0xF) as u8;
-            let l_h = (l >> 4) as u8;
-
-            if ib % 2 == 0 {
-                scales_l[ib / 2] = l_l;
-            } else {
-                scales_l[ib / 2] |= l_l << 4;
-            }
-            scales_h[ib / 8] |= (l_h as u16) << (2 * (ib as u16 % 8));
-        }
-    } else {
-        *d = f16::from_f32(scales[0]);
-        if ntry > 0 {
-            let id = if scales[0] != 0.0 {
-                1.0 / scales[0]
-            } else {
-                0.0
-            };
-            for j in 0..super_block_size {
-                let idx = best_index_int8(16, &values, id * xs_block[j]);
-                L[j] = idx as u8;
-            }
-        }
-    }
-
-    for i in 0..(super_block_size / 32) {
-        for j in 0..16 {
-            let l0 = L[32 * i + j];
-            let l1 = L[32 * i + 16 + j] << 4;
-            qs[16 * i + j] = l0 | l1;
-        }
-    }
 }
