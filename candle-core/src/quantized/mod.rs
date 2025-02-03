@@ -393,7 +393,7 @@ fn check_shape(shape: &Shape, block_size: usize) -> Result<()> {
     if dims.is_empty() {
         crate::bail!("scalar tensor cannot be quantized {shape:?}")
     }
-    if dims[dims.len() - 1] % block_size != 0 {
+    if dims.iter().product::<usize>() % block_size != 0 {
         crate::bail!(
             "quantized tensor must have their last dim divisible by block size {shape:?} {}",
             block_size
