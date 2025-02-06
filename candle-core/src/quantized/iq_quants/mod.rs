@@ -73,7 +73,7 @@ impl GgmlType for BlockIQ4xs {
             bail!("Input length must be multiple of QK_K = {}", QK_K);
         }
 
-=        quantize_iq4_xs(xs, ys, 1, k, None)?;
+        quantize_iq4_xs(xs, ys, 1, k, None)?;
 
         Ok(())
     }
