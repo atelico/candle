@@ -2447,6 +2447,7 @@ pub enum GgmlDType {
     F16,
     F32,
     BF16,
+    Iq4Xs
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2486,7 +2487,7 @@ pub fn call_quantized_matmul_mv_t(
     let r2: u32 = (ne12 / ne02) as u32;
     let r3: u32 = (ne13 / ne03) as u32;
 
-    let (nth0, nth1, align) = match dtype {
+    let (nth0, nth1, align, mem_size_bytes) = match dtype {
         GgmlDType::Q4_0
         | GgmlDType::Q4_1
         | GgmlDType::Q5_0
@@ -2496,7 +2497,7 @@ pub fn call_quantized_matmul_mv_t(
             let nth0 = 8;
             let nth1 = 8;
             let align = 8;
-            (nth0, nth1, align)
+            (nth0, nth1, align, None)
         }
         GgmlDType::Q2K => {
             // Fixing a bug in Metal for GGML
@@ -2504,38 +2505,44 @@ pub fn call_quantized_matmul_mv_t(
             let nth0 = 2;
             let nth1 = 32;
             let align = 4;
-            (nth0, nth1, align)
+            (nth0, nth1, align, None)
         }
         GgmlDType::Q4K => {
             let nth0 = 4;
             let nth1 = 8;
             let align = 4;
-            (nth0, nth1, align)
+            (nth0, nth1, align, None)
         }
         GgmlDType::Q3K | GgmlDType::Q5K => {
             let nth0 = 2;
             let nth1 = 32;
             let align = 4;
-            (nth0, nth1, align)
+            (nth0, nth1, align, None)
         }
         GgmlDType::Q6K => {
             let nth0 = 2;
             let nth1 = 32;
             let align = 2;
-            (nth0, nth1, align)
+            (nth0, nth1, align, None)
         }
         GgmlDType::F16 | GgmlDType::BF16 | GgmlDType::Q8K => {
             // Original implem uses rows
             let nth0 = 32;
             let nth1 = 1;
             let align = 8;
-            (nth0, nth1, align)
+            (nth0, nth1, align, None)
         }
         GgmlDType::F32 => {
             let nth0 = 32;
             let nth1 = 1;
             let align = 8;
-            (nth0, nth1, align)
+            (nth0, nth1, align, None)
+        }
+        GgmlDType::Iq4Xs => {
+            let nth0 = 4;
+            let nth1 = 16;
+            let align = 4;
+            (nth0, nth1, align, Some(32*std::mem::size_of::<f32>()))
         }
     };
     let thread_groups_count = MTLSize {
@@ -2564,12 +2571,17 @@ pub fn call_quantized_matmul_mv_t(
         GgmlDType::F16 => "kernel_mul_mv_f16_f32",
         GgmlDType::BF16 => "kernel_mul_mv_bf16_f32",
         GgmlDType::F32 => "kernel_mul_mv_f32_f32",
+        GgmlDType::Iq4Xs => "kernel_mul_mm_iq4_xs_f32",
     };
 
     let pipeline = kernels.load_pipeline(device, Source::Quantized, name)?;
     let encoder = ep.encoder();
     let encoder: &ComputeCommandEncoderRef = encoder.as_ref();
     encoder.set_compute_pipeline_state(&pipeline);
+
+    if let Some(mem_size_bytes) = mem_size_bytes {
+        encoder.set_threadgroup_memory_length(0, mem_size_bytes as u64);
+    }
 
     set_params!(
         encoder,
@@ -2672,6 +2684,7 @@ pub fn call_quantized_matmul_mm_t(
         GgmlDType::F16 => "kernel_mul_mm_f16_f32",
         GgmlDType::BF16 => "kernel_mul_mm_bf16_f32",
         GgmlDType::F32 => "kernel_mul_mm_f32_f32",
+        GgmlDType::Iq4Xs => "kernel_mul_mm_iq4_xs_f32",
     };
 
     let pipeline = kernels.load_pipeline(device, Source::Quantized, name)?;

@@ -5,7 +5,7 @@ use candle_core::{
     test_utils::to_vec2_round,
     DType, Device, IndexOp, Module, Result, Tensor, Var,
 };
-use quantized::{k_quants, GgmlType};
+use quantized::{iq_quants, k_quants, GgmlType};
 use rand::prelude::*;
 
 const GGML_TEST_SIZE: usize = 32 * 128;
@@ -1117,6 +1117,7 @@ fn ggml_reference_matmul_error(dtype: GgmlDType) -> Result<f32> {
         GgmlDType::Q5_0 => 0.001353,
         GgmlDType::Q5_1 => 0.00149,
         GgmlDType::Q8_0 => 0.000092,
+        GgmlDType::Iq4Xs => 0.001903,
 
         // Not from the ggml repo.
         GgmlDType::Q8K => 0.00065,
@@ -1287,6 +1288,13 @@ quantized_matmul!(
     GgmlDType::Q3K
 );
 quantized_matmul!(
+    quantized_matmul_iq4xs_bis,
+    quantized_matmul_iq4xs_cpu,
+    quantized_matmul_iq4xs_cuda,
+    quantized_matmul_iq4xs_metal,
+    GgmlDType::Q4K
+);
+quantized_matmul!(
     quantized_matmul_q4k_bis,
     quantized_matmul_q4k_cpu,
     quantized_matmul_q4k_cuda,
@@ -1390,6 +1398,32 @@ fn quantized_matmul_q4k() -> Result<()> {
     assert_eq!(dst, [1.125, 1.435, -0.201, 1.589]);
 
     ggml_matmul_error_test::<BlockQ4K>()?;
+
+    Ok(())
+}
+
+#[test]
+fn quantized_matmul_iq4xs() -> Result<()> {
+    use iq_quants::BlockIQ4xs;
+
+    let cpu = &Device::Cpu;
+    let (m, k, n) = (11, 512, 21);
+    let (lhs, rhs, mm) = get_random_tensors(m, k, n, cpu)?;
+    assert_eq!(mm.dims(), [m, n]);
+    let dst = mm.flatten_all()?.to_vec1::<f32>()?;
+    let dst = round_vector(&[dst[0], dst[m * n / 3], dst[m * n * 2 / 3], dst[m * n - 1]]);
+    assert_eq!(dst, [1.262, 1.513, -0.208, 1.702]);
+
+    let rhs = quantized::QTensor::quantize(&rhs, GgmlDType::Iq4Xs)?;
+    let rhs = quantized::QMatMul::from_qtensor(rhs)?;
+    let mm = rhs.forward(&lhs)?;
+
+    assert_eq!(mm.dims(), [m, n]);
+    let dst = mm.flatten_all()?.to_vec1::<f32>()?;
+    let dst = round_vector(&[dst[0], dst[m * n / 3], dst[m * n * 2 / 3], dst[m * n - 1]]);
+    assert_eq!(dst, [1.442, 1.509, -0.293, 1.631]);
+
+    ggml_matmul_error_test::<BlockIQ4xs>()?;
 
     Ok(())
 }
