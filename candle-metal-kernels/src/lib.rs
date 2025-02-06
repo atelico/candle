@@ -2449,6 +2449,7 @@ pub enum GgmlDType {
     BF16,
     Iq4Xs,
     Iq4Nl,
+    Iq3Xxs,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2545,6 +2546,12 @@ pub fn call_quantized_matmul_mv_t(
             let align = 4;
             (nth0, nth1, align, Some(32*std::mem::size_of::<f32>()))
         }
+        GgmlDType::Iq3Xxs => {
+            let nth0 = 4;
+            let nth1 = 16;
+            let align = 8;
+            (nth0, nth1, align, Some( 256*4+128))
+        }
     };
     let thread_groups_count = MTLSize {
         width: divide(ne01 as usize, align),
@@ -2574,6 +2581,7 @@ pub fn call_quantized_matmul_mv_t(
         GgmlDType::F32 => "kernel_mul_mv_f32_f32",
         GgmlDType::Iq4Xs => "kernel_mul_mv_iq4_xs_f32",
         GgmlDType::Iq4Nl => "kernel_mul_mv_iq4_nl_f32",
+        GgmlDType::Iq3Xxs => "kernel_mul_mv_iq3_xxs_f32",
     };
 
     let pipeline = kernels.load_pipeline(device, Source::Quantized, name)?;
@@ -2688,6 +2696,7 @@ pub fn call_quantized_matmul_mm_t(
         GgmlDType::F32 => "kernel_mul_mm_f32_f32",
         GgmlDType::Iq4Xs => "kernel_mul_mm_iq4_xs_f32",
         GgmlDType::Iq4Nl => "kernel_mul_mm_iq4_nl_f32",
+        GgmlDType::Iq3Xxs => "kernel_mul_mm_iq3_xxs_f32",
     };
 
     let pipeline = kernels.load_pipeline(device, Source::Quantized, name)?;

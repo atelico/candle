@@ -1023,6 +1023,44 @@ fn quantize_iq4_nl(device: &Device) -> Result<()> {
     Ok(())
 }
 
+fn quantize_iq3_xxs(device: &Device) -> Result<()> {
+    let dtype = GgmlDType::Iq3Xxs;
+    let src = get_test_vector2(0.5, 1024, device)?;
+    let quant = quantized::QTensor::quantize(&src, dtype)?;
+    let dst = quant.dequantize(device)?;
+    let dst_f16 = quant.dequantize_f16(device)?;
+    dbg!(&dst.mean_all()?);
+    let diff = (dst.to_dtype(DType::F16)? - dst_f16)?
+        .to_dtype(DType::F32)?
+        .abs()?
+        .sum_all()?
+        .to_vec0::<f32>()?;
+    assert_eq!(diff, 0.);
+
+    let src = src.to_vec1::<f32>()?;
+    let dst = dst.to_vec1::<f32>()?;
+    compare_with_error(dst.as_slice(), src.as_slice(), 0.025);
+
+    let src_big = get_test_vector2(128.0, 1024, device)?;
+    let quant_big = quantized::QTensor::quantize(&src_big, dtype)?;
+    let dst_big = quant_big.dequantize(device)?;
+    let dst_big_f16 = quant_big.dequantize_f16(device)?;
+    let diff = (dst_big.to_dtype(DType::F16)? - dst_big_f16)?
+        .to_dtype(DType::F32)?
+        .abs()?
+        .sum_all()?
+        .to_vec0::<f32>()?;
+    assert_eq!(diff, 0.);
+
+    let src_big = src_big.to_vec1::<f32>()?;
+    let dst_big = dst_big.to_vec1::<f32>()?;
+    compare_with_error(dst_big.as_slice(), src_big.as_slice(), 5.9);
+
+    ggml_quantization_error_test(dtype, device, GGML_MAX_QUANTIZATION_TOTAL_ERROR)?;
+
+    Ok(())
+}
+
 #[test]
 fn imatrix_quantize_iq4_xs() -> Result<()> {
     // let data =
@@ -1184,6 +1222,12 @@ test_device!(
     quantize_iq4_nl_cpu,
     quantize_iq4_nl_cuda,
     quantize_iq4_nl_metal
+);
+test_device!(
+    quantize_iq3_xxs,
+    quantize_iq3_xxs_cpu,
+    quantize_iq3_xxs_cuda,
+    quantize_iq3_xxs_metal
 );
 
 /// Very simple dot product implementation

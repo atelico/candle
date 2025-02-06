@@ -204,6 +204,7 @@ pub enum GgmlDType {
     Q8K,
     Iq4Xs,
     Iq4Nl,
+    Iq3Xxs,
 }
 
 impl GgmlDType {
@@ -223,6 +224,7 @@ impl GgmlDType {
             13 => Self::Q5K,
             14 => Self::Q6K,
             15 => Self::Q8K,
+            18 => Self::Iq3Xxs,
             20 => Self::Iq4Nl,
             23 => Self::Iq4Xs,
             // https://github.com/ggerganov/ggml/blob/29d87fc6676e7ed0cdfdec0804b06001d9c2bb44/include/ggml.h#L389
@@ -248,6 +250,7 @@ impl GgmlDType {
             Self::Q5K => 13,
             Self::Q6K => 14,
             Self::Q8K => 15,
+            Self::Iq3Xxs => 18,
             Self::Iq4Nl => 20,
             Self::Iq4Xs => 23,
             // https://github.com/ggerganov/ggml/blob/29d87fc6676e7ed0cdfdec0804b06001d9c2bb44/include/ggml.h#L389
@@ -280,6 +283,10 @@ impl GgmlDType {
                 BlockIQ4xs::zeros();
                 elem_count / BlockIQ4xs::BLCK_SIZE
             ]),
+            Self::Iq3Xxs => Box::new(vec![
+                BlockIQ3xxs::zeros();
+                elem_count / BlockIQ3xxs::BLCK_SIZE
+            ]),
             Self::BF16 => Box::new(vec![bf16::zeros(); elem_count]),
         }
     }
@@ -304,6 +311,7 @@ impl GgmlDType {
             Self::Q8K => std::mem::size_of::<BlockQ8K>(),
             Self::Iq4Nl => std::mem::size_of::<BlockIQ4nl>(),
             Self::Iq4Xs => std::mem::size_of::<BlockIQ4xs>(),
+            Self::Iq3Xxs => std::mem::size_of::<BlockIQ3xxs>(),
         }
     }
 
@@ -319,9 +327,14 @@ impl GgmlDType {
             Self::Q8_0 => k_quants::QK8_0,
             Self::Q8_1 => k_quants::QK8_1,
             Self::Iq4Nl => iq_quants::QK4_NL,
-            Self::Q2K | Self::Q3K | Self::Q4K | Self::Q5K | Self::Q6K | Self::Q8K | Self::Iq4Xs => {
-                k_quants::QK_K
-            }
+            Self::Q2K
+            | Self::Q3K
+            | Self::Q4K
+            | Self::Q5K
+            | Self::Q6K
+            | Self::Q8K
+            | Self::Iq4Xs
+            | Self::Iq3Xxs => k_quants::QK_K,
         }
     }
 }
