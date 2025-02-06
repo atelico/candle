@@ -1,5 +1,5 @@
 use super::{
-    iq_quants::BlockIQ4xs,
+    iq_quants::{BlockIQ4nl, BlockIQ4xs, QK4_NL},
     k_quants::{
         BlockQ2K, BlockQ3K, BlockQ4K, BlockQ4_0, BlockQ5K, BlockQ6K, BlockQ8K, BlockQ8_0, QK8_0,
         QK_K,
@@ -1960,6 +1960,49 @@ pub(crate) fn vec_dot_iq4_xs_q8k(n: usize, xs: &[BlockIQ4xs], ys: &[BlockQ8K]) -
             }
 
             sumf += xs[ibl].d.to_f32() * ys[ibl].d * (sumi1 + sumi2) as f32;
+        }
+
+        Ok(sumf)
+    }
+}
+
+#[inline(always)]
+pub(crate) fn vec_dot_iq4_nl_q8k(n: usize, xs: &[BlockIQ4nl], ys: &[BlockQ8_0]) -> Result<f32> {
+    if n % QK4_NL != 0 {
+        crate::bail!("vec_dot_iq4_nl_q8k: {n} is not divisible by {QK4_NL}")
+    }
+
+    unsafe {
+        let values = vld1q_s8(KVALUES_IQ4NL.as_ptr());
+        let m4b = vdupq_n_u8(0x0f);
+
+        let mut q4b = int8x16x4_t(vdupq_n_s8(0), vdupq_n_s8(0), vdupq_n_s8(0), vdupq_n_s8(0));
+        let mut q8b = int8x16x4_t(vdupq_n_s8(0), vdupq_n_s8(0), vdupq_n_s8(0), vdupq_n_s8(0));
+        let mut q4bits = uint8x16x2_t(vdupq_n_u8(0), vdupq_n_u8(0));
+
+        let mut sumf = 0f32;
+
+        let nb = n / QK4_NL;
+        for ib in (0..nb - 1).step_by(2) {
+            q4bits.0 = vld1q_u8(xs[ib].qs.as_ptr());
+            q4bits.1 = vld1q_u8(xs[ib + 1].qs.as_ptr());
+            q8b.0 = vld1q_s8(ys[ib].qs.as_ptr());
+            q8b.1 = vld1q_s8(ys[ib].qs.as_ptr().add(16));
+            q8b.2 = vld1q_s8(ys[ib + 1].qs.as_ptr());
+            q8b.3 = vld1q_s8(ys[ib + 1].qs.as_ptr().add(16));
+
+            q4b.0 = vqtbl1q_s8(values, vandq_u8(q4bits.0, m4b));
+            q4b.1 = vqtbl1q_s8(values, vshrq_n_u8(q4bits.0, 4));
+            q4b.2 = vqtbl1q_s8(values, vandq_u8(q4bits.1, m4b));
+            q4b.3 = vqtbl1q_s8(values, vshrq_n_u8(q4bits.1, 4));
+
+            let prod1 =
+                vdotq_s32_local(vdotq_s32_local(vdupq_n_s32(0), q4b.0, q8b.0), q4b.1, q8b.1);
+            let prod2 =
+                vdotq_s32_local(vdotq_s32_local(vdupq_n_s32(0), q4b.2, q8b.2), q4b.3, q8b.3);
+
+            sumf += xs[ib].d.to_f32() * ys[ib].d.to_f32() * vaddvq_s32(prod1) as f32
+                + xs[ib + 1].d.to_f32() * ys[ib + 1].d.to_f32() * vaddvq_s32(prod2) as f32;
         }
 
         Ok(sumf)

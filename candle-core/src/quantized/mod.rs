@@ -203,6 +203,7 @@ pub enum GgmlDType {
     Q6K,
     Q8K,
     Iq4Xs,
+    Iq4Nl,
 }
 
 impl GgmlDType {
@@ -246,6 +247,7 @@ impl GgmlDType {
             Self::Q5K => 13,
             Self::Q6K => 14,
             Self::Q8K => 15,
+            Self::Iq4Nl => 20,
             Self::Iq4Xs => 23,
             // https://github.com/ggerganov/ggml/blob/29d87fc6676e7ed0cdfdec0804b06001d9c2bb44/include/ggml.h#L389
             Self::BF16 => 30,
@@ -269,6 +271,10 @@ impl GgmlDType {
             Self::Q5K => Box::new(vec![BlockQ5K::zeros(); elem_count / BlockQ5K::BLCK_SIZE]),
             Self::Q6K => Box::new(vec![BlockQ6K::zeros(); elem_count / BlockQ6K::BLCK_SIZE]),
             Self::Q8K => Box::new(vec![BlockQ8K::zeros(); elem_count / BlockQ8K::BLCK_SIZE]),
+            Self::Iq4Nl => Box::new(vec![
+                BlockIQ4nl::zeros();
+                elem_count / BlockIQ4nl::BLCK_SIZE
+            ]),
             Self::Iq4Xs => Box::new(vec![
                 BlockIQ4xs::zeros();
                 elem_count / BlockIQ4xs::BLCK_SIZE
@@ -295,6 +301,7 @@ impl GgmlDType {
             Self::Q5K => std::mem::size_of::<BlockQ5K>(),
             Self::Q6K => std::mem::size_of::<BlockQ6K>(),
             Self::Q8K => std::mem::size_of::<BlockQ8K>(),
+            Self::Iq4Nl => std::mem::size_of::<BlockIQ4nl>(),
             Self::Iq4Xs => std::mem::size_of::<BlockIQ4xs>(),
         }
     }
@@ -310,6 +317,7 @@ impl GgmlDType {
             Self::Q5_1 => k_quants::QK5_1,
             Self::Q8_0 => k_quants::QK8_0,
             Self::Q8_1 => k_quants::QK8_1,
+            Self::Iq4Nl => iq_quants::QK4_NL,
             Self::Q2K | Self::Q3K | Self::Q4K | Self::Q5K | Self::Q6K | Self::Q8K | Self::Iq4Xs => {
                 k_quants::QK_K
             }

@@ -9,8 +9,8 @@ pub(super) fn quantize_row_iq4_nl_impl(
     x: &[f32],
     dh: &mut f16,
     q4: &mut [u8],
-    scales_h: &mut u16,
-    scales_l: &mut [u8],
+    scales_h: Option<&mut u16>,
+    scales_l: Option<&mut [u8]>,
     scales: &mut [f32],
     weight: &mut [f32],
     lbuf: &mut [u8],
@@ -24,7 +24,6 @@ pub(super) fn quantize_row_iq4_nl_impl(
     let sb_div_64 = super_block_size / 64;
     assert_eq!(q4.len(), sb_div_2);
     assert_eq!(scales.len(), sb_div_32);
-    assert_eq!(scales_l.len(), sb_div_64);
     assert_eq!(lbuf.len(), super_block_size);
     assert_eq!(weight.len(), block_size);
 
@@ -141,6 +140,10 @@ pub(super) fn quantize_row_iq4_nl_impl(
 
     // 8. If we have more than one 32-float block in the super-block:
     if nblocks > 1 {
+        let scales_h = scales_h.expect("Expected scales_h, nblocks > 1");
+        let scales_l = scales_l.expect("Expected scales_l, nblocks > 1");
+        assert_eq!(scales_l.len(), sb_div_64);
+
         // zero scales_h, because we store 2 bits per block in it
         // for nblocks=8, we store them in a single 16-bit value
         *scales_h = 0;

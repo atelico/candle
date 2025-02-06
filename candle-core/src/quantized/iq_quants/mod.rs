@@ -5,7 +5,7 @@ use crate::{bail, Result};
 
 mod utils;
 
-use super::{BlockQ8K, GgmlDType, GgmlType, QK_K};
+use super::{k_quants::BlockQ8_0, BlockQ8K, GgmlDType, GgmlType, QK_K};
 
 pub const QK4_NL: usize = 32;
 
@@ -90,7 +90,7 @@ impl GgmlType for BlockIQ4xs {
         }
         let nrow = xs.len() / n_per_row;
 
-        quantize_iq4_xs_imatrix(xs, ys, nrow, n_per_row, Some(imatrix_weights));
+        quantize_iq4_xs(xs, ys, nrow, n_per_row, Some(imatrix_weights))?;
 
         Ok(())
     }
@@ -192,6 +192,126 @@ impl GgmlType for BlockIQ4xs {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+#[repr(C)]
+pub struct BlockIQ4nl {
+    pub(crate) d: f16,
+    pub(crate) qs: [u8; QK4_NL / 2],
+}
+
+const _: () = assert!(
+    std::mem::size_of::<BlockIQ4nl>() == std::mem::size_of::<f16>() + QK4_NL / 2,
+    "wrong iq4_nl block size/padding"
+);
+
+impl GgmlType for BlockIQ4nl {
+    const DTYPE: GgmlDType = GgmlDType::Iq4Nl;
+    const BLCK_SIZE: usize = QK4_NL;
+    type VecDotType = BlockQ8_0;
+    const SUPPORTS_I8MM: bool = false;
+
+    fn to_float(xs: &[Self], mut ys: &mut [f32]) -> Result<()> {
+        let k = ys.len();
+        if k % QK4_NL != 0 {
+            crate::bail!("dequantize block iq4xs {k} is not divisible by {QK4_NL}");
+        }
+
+        let nb = k / QK4_NL;
+        for block in xs.iter().take(nb) {
+            let d = block.d.to_f32();
+            let qs = &block.qs[..];
+
+            for j in 0..(QK4_NL / 2) {
+                ys[j] = d * KVALUES_IQ4NL[(qs[j] & 0xf) as usize] as f32;
+                ys[j + QK4_NL / 2] = d * KVALUES_IQ4NL[(qs[j] >> 4) as usize] as f32;
+            }
+            ys = &mut ys[QK4_NL..];
+        }
+        Ok(())
+    }
+
+    fn from_float(xs: &[f32], ys: &mut [Self]) -> Result<()> {
+        let k = xs.len();
+        if k % QK4_NL != 0 {
+            bail!("Input length must be multiple of QK4_NL = {}", QK4_NL);
+        }
+
+        quantize_iq4_nl(xs, ys, 1, k, None)?;
+
+        Ok(())
+    }
+
+    fn from_float_imatrix(
+        xs: &[f32],
+        ys: &mut [Self],
+        imatrix_weights: &[f32],
+        n_per_row: usize,
+    ) -> Result<()> {
+        let k = xs.len();
+        if k % QK4_NL != 0 {
+            bail!("Input length must be multiple of QK4_NL = {}", QK4_NL);
+        }
+        let nrow = xs.len() / n_per_row;
+
+        quantize_iq4_nl(xs, ys, nrow, n_per_row, Some(imatrix_weights))?;
+
+        Ok(())
+    }
+
+    #[allow(unreachable_code)]
+    fn vec_dot(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
+        // #[cfg(target_feature = "avx")]
+        // todo!();
+
+        #[cfg(target_feature = "neon")]
+        return super::neon::vec_dot_iq4_nl_q8k(n, xs, ys);
+
+        Self::vec_dot_unopt(n, xs, ys)
+    }
+
+    fn vec_dot_unopt(n: usize, xs: &[Self], ys: &[Self::VecDotType]) -> Result<f32> {
+        if n % QK4_NL != 0 {
+            bail!("n must be a multiple of QK4_NL");
+        }
+        let nb = n / QK4_NL;
+
+        let mut sumf = 0.0f32;
+
+        // Loop over each block
+        for ibl in 0..nb {
+            let x = &xs[ibl];
+            let y = &ys[ibl];
+
+            let d = x.d.to_f32() * y.d.to_f32();
+
+            let mut sumi1 = 0;
+            let mut sumi2 = 0;
+
+            for j in 0..QK4_NL / 2 {
+                sumi1 += y.qs[j] as i32 * KVALUES_IQ4NL[(x.qs[j] & 0xf) as usize] as i32;
+                sumi2 +=
+                    y.qs[j + QK4_NL / 2] as i32 * KVALUES_IQ4NL[(x.qs[j] >> 4) as usize] as i32;
+            }
+
+            sumf += d * (sumi1 + sumi2) as f32;
+        }
+
+        Ok(sumf)
+    }
+
+    #[allow(unused)]
+    #[cfg(feature = "arm-nightly-feat")]
+    fn matmul_i8mm(
+        n: usize,
+        xs_0: &[Self],
+        xs_1: &[Self],
+        ys_0: &[Self::VecDotType],
+        ys_1: &[Self::VecDotType],
+    ) -> Result<[f32; 4]> {
+        crate::bail!("Unsupported block type for i8mm");
+    }
+}
+
 fn quantize_iq4_xs(
     src: &[f32],
     ys: &mut [BlockIQ4xs],
@@ -237,8 +357,8 @@ fn quantize_iq4_xs(
                 &src[src_offset + QK_K * ibl..src_offset + QK_K * (ibl + 1)],
                 /* dh               = */ &mut block.d,
                 /* q4               = */ &mut block.qs,
-                /* scales_h         = */ &mut block.scales_h,
-                /* scales_l         = */ &mut block.scales_l,
+                /* scales_h         = */ Some(&mut block.scales_h),
+                /* scales_l         = */ Some(&mut block.scales_l),
                 /* scales           = */ &mut scales,
                 /* weight           = */ &mut weight,
                 /* L                = */ &mut lbuf,
@@ -254,59 +374,64 @@ fn quantize_iq4_xs(
     Ok(())
 }
 
-pub fn quantize_iq4_xs_imatrix(
+fn quantize_iq4_nl(
     src: &[f32],
-    dst: &mut [BlockIQ4xs],
+    ys: &mut [BlockIQ4nl],
     nrow: usize,
     n_per_row: usize,
     quant_weights: Option<&[f32]>,
-) {
-    // 1. Check that n_per_row is multiple of QK_K
-    assert_eq!(n_per_row % QK_K, 0, "n_per_row must be multiple of QK_K");
-    let nblock = n_per_row / QK_K;
+) -> Result<()> {
+    if n_per_row % QK4_NL != 0 {
+        bail!("n_per_row must be multiple of QK4_NL = {}", QK4_NL);
+    }
 
-    // 2. We expect nrow * nblock blocks in `dst`
-    assert_eq!(
-        dst.len(),
-        nrow * nblock,
-        "Output slice must have exactly nrow*nblock elements"
-    );
+    let nblock = n_per_row / QK4_NL;
+    // We expect exactly nrow * nblock blocks in `ys`.
+    if ys.len() != nrow * nblock {
+        bail!(
+            "Output buffer size mismatch: want {} blocks, got {}",
+            nrow * nblock,
+            ys.len()
+        );
+    }
 
-    // 3. Local buffers matching the C usage
-    let mut lbuf = vec![0u8; QK_K];
-    let mut weight = vec![0f32; 32];
-    let mut scales = vec![0f32; QK_K / 32];
+    let mut lbuf = vec![0u8; QK4_NL]; // L[QK4_NL]
+    let mut weight = vec![0f32; QK4_NL]; // weight[QK4_NL]
+    let mut scales = vec![0f32]; // scales[1]
 
-    // We'll track how far we've consumed `src`.
     let mut src_offset = 0;
-    // Also track how far we move in `dst`.
     let mut dst_offset = 0;
 
-    // 4. Outer loop over rows
     for _row in 0..nrow {
+        // Each row has `nblock` blocks:
         for ibl in 0..nblock {
-            let block = &mut dst[dst_offset + ibl];
+            let block = &mut ys[dst_offset + ibl];
 
-            // If quant_weights is Some, get the sub-slice for this block
-            let qw_block = quant_weights.map(|qw_all| &qw_all[ibl * QK_K..(ibl + 1) * QK_K]);
+            let qw = quant_weights.map(|qw_all| {
+                let start = QK4_NL * ibl;
+                &qw_all[start..start + QK4_NL]
+            });
 
             quantize_row_iq4_nl_impl(
-                QK_K, // super_block_size
-                32,   // block_size
-                &src[src_offset + ibl * QK_K..src_offset + (ibl + 1) * QK_K],
-                &mut block.d,
-                &mut block.qs,
-                &mut block.scales_h,
-                &mut block.scales_l,
-                &mut scales,
-                &mut weight,
-                &mut lbuf,
-                &KVALUES_IQ4NL,
-                qw_block,
-                7, // ntry
+                /* super_block_size = */ QK4_NL,
+                /* block_size       = */ 32,
+                /* x                = */
+                &src[src_offset + QK4_NL * ibl..src_offset + QK4_NL * (ibl + 1)],
+                /* dh               = */ &mut block.d,
+                /* q4               = */ &mut block.qs,
+                /* scales_h         = */ None,
+                /* scales_l         = */ None,
+                /* scales           = */ &mut scales,
+                /* weight           = */ &mut weight,
+                /* L                = */ &mut lbuf,
+                /* values           = */ &KVALUES_IQ4NL,
+                /* quant_weights    = */ qw,
+                /* ntry             = */ 7,
             );
         }
         src_offset += n_per_row;
         dst_offset += nblock;
     }
+
+    Ok(())
 }

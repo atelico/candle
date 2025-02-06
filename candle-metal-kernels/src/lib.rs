@@ -2447,7 +2447,8 @@ pub enum GgmlDType {
     F16,
     F32,
     BF16,
-    Iq4Xs
+    Iq4Xs,
+    Iq4Nl,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2538,7 +2539,7 @@ pub fn call_quantized_matmul_mv_t(
             let align = 8;
             (nth0, nth1, align, None)
         }
-        GgmlDType::Iq4Xs => {
+        GgmlDType::Iq4Xs | GgmlDType::Iq4Nl => {
             let nth0 = 4;
             let nth1 = 16;
             let align = 4;
@@ -2572,6 +2573,7 @@ pub fn call_quantized_matmul_mv_t(
         GgmlDType::BF16 => "kernel_mul_mv_bf16_f32",
         GgmlDType::F32 => "kernel_mul_mv_f32_f32",
         GgmlDType::Iq4Xs => "kernel_mul_mv_iq4_xs_f32",
+        GgmlDType::Iq4Nl => "kernel_mul_mv_iq4_nl_f32",
     };
 
     let pipeline = kernels.load_pipeline(device, Source::Quantized, name)?;
@@ -2685,6 +2687,7 @@ pub fn call_quantized_matmul_mm_t(
         GgmlDType::BF16 => "kernel_mul_mm_bf16_f32",
         GgmlDType::F32 => "kernel_mul_mm_f32_f32",
         GgmlDType::Iq4Xs => "kernel_mul_mm_iq4_xs_f32",
+        GgmlDType::Iq4Nl => "kernel_mul_mm_iq4_nl_f32",
     };
 
     let pipeline = kernels.load_pipeline(device, Source::Quantized, name)?;
