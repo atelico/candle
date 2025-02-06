@@ -73,6 +73,7 @@ impl GgmlType for BlockIQ4xs {
             bail!("Input length must be multiple of QK_K = {}", QK_K);
         }
 
+        println!("starting");
         quantize_iq4_xs(xs, ys, 1, k, None)?;
 
         Ok(())
@@ -223,6 +224,7 @@ fn quantize_iq4_xs(
     for _row in 0..nrow {
         // Each row has `nblock` blocks:
         for ibl in 0..nblock {
+            println!("ibl {ibl}");
             let block = &mut ys[dst_offset + ibl];
 
             let qw = quant_weights.map(|qw_all| {
