@@ -2571,7 +2571,7 @@ pub fn call_quantized_matmul_mv_t(
         GgmlDType::F16 => "kernel_mul_mv_f16_f32",
         GgmlDType::BF16 => "kernel_mul_mv_bf16_f32",
         GgmlDType::F32 => "kernel_mul_mv_f32_f32",
-        GgmlDType::Iq4Xs => "kernel_mul_mm_iq4_xs_f32",
+        GgmlDType::Iq4Xs => "kernel_mul_mv_iq4_xs_f32",
     };
 
     let pipeline = kernels.load_pipeline(device, Source::Quantized, name)?;
