@@ -1,8 +1,8 @@
 use super::{
     iq_quants::{BlockIQ4nl, BlockIQ4xs, QK4_NL},
     k_quants::{
-        BlockQ2K, BlockQ3K, BlockQ4K, BlockQ4_0, BlockQ5K, BlockQ6K, BlockQ8K, BlockQ8_0, QK8_0,
-        QK_K,
+        BlockF8Q8, BlockQ2K, BlockQ3K, BlockQ4K, BlockQ4_0, BlockQ5K, BlockQ6K, BlockQ8K,
+        BlockQ8_0, QK8_0, QK_K,
     },
 };
 use crate::{quantized::KVALUES_IQ4NL, Result};
@@ -203,6 +203,100 @@ pub(crate) fn i8mm_q8_0_q8_0(
             let factor_01: f32 = x1.d.to_f32() * y0.d.to_f32();
             let factor_10: f32 = x0.d.to_f32() * y1.d.to_f32();
             let factor_11: f32 = x1.d.to_f32() * y1.d.to_f32();
+
+            let xv0_0 = vld1q_s8(x0.qs.as_ptr());
+            let xv0_1 = vld1q_s8(x0.qs.as_ptr().add(16));
+            let xv1_0 = vld1q_s8(x1.qs.as_ptr());
+            let xv1_1 = vld1q_s8(x1.qs.as_ptr().add(16));
+
+            let yv0_0 = vld1q_s8(y0.qs.as_ptr());
+            let yv0_1 = vld1q_s8(y0.qs.as_ptr().add(16));
+            let yv1_0 = vld1q_s8(y1.qs.as_ptr());
+            let yv1_1 = vld1q_s8(y1.qs.as_ptr().add(16));
+
+            let i8mm = i8mm_params::new(xv0_0, xv0_1, xv1_0, xv1_1, yv0_0, yv0_1, yv1_0, yv1_1);
+            let loop_sum_s32 = i8mm.calculate(vdupq_n_s32(0));
+
+            // scaling
+            let factor_elems: [f32; 4] = [factor_00, factor_01, factor_10, factor_11];
+            let rawptr = &factor_elems as *const f32;
+            let factor: float32x4_t = vld1q_f32(rawptr);
+            let loop_sum_f32 = vcvtq_f32_s32(loop_sum_s32);
+
+            sum_f32 = vmlaq_f32(sum_f32, loop_sum_f32, factor);
+        }
+        // extract elements of the vector register
+        let f0 = vgetq_lane_f32(sum_f32, 0);
+        let f1 = vgetq_lane_f32(sum_f32, 1);
+        let f2 = vgetq_lane_f32(sum_f32, 2);
+        let f3 = vgetq_lane_f32(sum_f32, 3);
+        let res: [f32; 4] = [f0, f1, f2, f3];
+        Ok(res)
+    }
+}
+
+#[inline(always)]
+pub(crate) fn vec_dot_f8q8_q8_0(n: usize, xs: &[BlockF8Q8], ys: &[BlockQ8_0]) -> Result<f32> {
+    let qk = QK8_0;
+    if n % QK8_0 != 0 {
+        crate::bail!("vec_dot_f8q8_q8_0: {n} is not divisible by {qk}")
+    }
+    let nb = n / QK8_0;
+    unsafe {
+        let mut sumv0 = vdupq_n_f32(0.0f32);
+        for i in 0..nb {
+            let x0 = &xs[i];
+            let y0 = &ys[i];
+
+            let x0_0 = vld1q_s8(x0.qs.as_ptr());
+            let x0_1 = vld1q_s8(x0.qs.as_ptr().add(16));
+
+            // load y
+            let y0_0 = vld1q_s8(y0.qs.as_ptr());
+            let y0_1 = vld1q_s8(y0.qs.as_ptr().add(16));
+
+            let p0 = vdotq_s32_local(vdupq_n_s32(0), x0_0, y0_0);
+            let p1 = vdotq_s32_local(vdupq_n_s32(0), x0_1, y0_1);
+
+            sumv0 = vmlaq_n_f32(
+                sumv0,
+                vcvtq_f32_s32(vaddq_s32(p0, p1)),
+                x0.dq_d() * y0.d.to_f32(),
+            );
+        }
+        Ok(vaddvq_f32(sumv0))
+    }
+}
+#[inline(always)]
+#[cfg(feature = "arm-nightly-feat")]
+pub(crate) fn i8mm_q8_0_q8_0(
+    n: usize,
+    xs_0: &[BlockF8Q8],
+    xs_1: &[BlockF8Q8],
+    ys_0: &[BlockQ8_0],
+    ys_1: &[BlockQ8_0],
+) -> Result<[f32; 4]> {
+    assert_eq!(xs_0.len(), xs_1.len());
+    assert_eq!(ys_0.len(), ys_1.len());
+    assert_eq!(xs_0.len(), ys_0.len());
+    let qk = QK8_0;
+    if n % QK8_0 != 0 {
+        crate::bail!("i8mm_q8_0_q8_0: {n} is not divisible by {qk}")
+    }
+    let nb = n / QK8_0;
+    unsafe {
+        let mut sum_f32 = vdupq_n_f32(0.0);
+
+        for i in 0..nb {
+            let x0 = &xs_0[i];
+            let x1 = &xs_1[i];
+            let y0 = &ys_0[i];
+            let y1 = &ys_1[i];
+
+            let factor_00: f32 = x0.dq_d() * y0.d.to_f32();
+            let factor_01: f32 = x1.dq_d() * y0.d.to_f32();
+            let factor_10: f32 = x0.dq_d() * y1.d.to_f32();
+            let factor_11: f32 = x1.dq_d() * y1.d.to_f32();
 
             let xv0_0 = vld1q_s8(x0.qs.as_ptr());
             let xv0_1 = vld1q_s8(x0.qs.as_ptr().add(16));

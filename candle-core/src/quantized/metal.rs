@@ -119,6 +119,10 @@ impl QMetalStorage {
                 let vec: Vec<crate::quantized::BlockIQ3xxs> = read_to_vec(&buffer, block_len);
                 crate::quantized::BlockIQ3xxs::to_float(&vec, &mut out)?;
             }
+            GgmlDType::F8Q8 => {
+                let vec: Vec<crate::quantized::BlockF8Q8> = read_to_vec(&buffer, block_len);
+                crate::quantized::BlockF8Q8::to_float(&vec, &mut out)?;
+            }
         }
 
         let buffer = self.device.new_buffer_with_data(&out)?;
@@ -405,6 +409,7 @@ impl From<GgmlDType> for candle_metal_kernels::GgmlDType {
             GgmlDType::F16 => candle_metal_kernels::GgmlDType::F16,
             GgmlDType::F32 => candle_metal_kernels::GgmlDType::F32,
             GgmlDType::BF16 => candle_metal_kernels::GgmlDType::F16,
+            GgmlDType::F8Q8 => todo!("F8Q8 is unsupported on Metal"),
         }
     }
 }

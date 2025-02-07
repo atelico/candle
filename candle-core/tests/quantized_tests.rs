@@ -386,6 +386,26 @@ fn quantize_q5_1(device: &Device) -> Result<()> {
     Ok(())
 }
 
+fn quantize_f8q8(device: &Device) -> Result<()> {
+    let dtype = GgmlDType::F8Q8;
+    let src = get_test_vector2(0.5, 1024, device)?;
+    let quant = quantized::QTensor::quantize(&src, dtype)?;
+    let dst = quant.dequantize(device)?;
+    let dst_f16 = quant.dequantize_f16(device)?;
+    let diff = (dst.to_dtype(DType::F16)? - dst_f16)?
+        .to_dtype(DType::F32)?
+        .abs()?
+        .sum_all()?
+        .to_vec0::<f32>()?;
+    assert_eq!(diff, 0.);
+
+    let src = src.to_vec1::<f32>()?;
+    let dst = dst.to_vec1::<f32>()?;
+    compare_with_error(dst.as_slice(), src.as_slice(), 0.01);
+
+    Ok(())
+}
+
 fn get_test_vector2(bound: f32, size: usize, device: &Device) -> Result<Tensor> {
     assert!(
         size % crate::quantized::k_quants::QK_K == 0,
@@ -1175,6 +1195,12 @@ test_device!(
     quantize_q5_1_cpu,
     quantize_q5_1_cuda,
     quantize_q5_1_metal
+);
+test_device!(
+    quantize_f8q8,
+    quantize_f8q8_cpu,
+    quantize_f8q8_cuda,
+    quantize_f8q8_metal
 );
 test_device!(
     quantize_q2k,
