@@ -438,12 +438,12 @@ fn iq3xs_init_impl(grid_size: i32) {
             dist_vec.push((d, j));
         }
         // Sort the vector: first by distance, then by grid index.
-        dist_vec.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
+        dist_vec.sort_by(|a, b| a.cmp(&b));
         // Count how many neighbors to include.
         let mut n = 0;
         let mut nhave = 1;
         let mut d_current = dist_vec[0].0;
-        for &(d, _) in dist_vec.iter().step_by(2) {
+        for &(d, _) in dist_vec.iter() {
             if d > d_current {
                 if nhave == nwant {
                     break;
@@ -480,7 +480,7 @@ fn iq3xs_init_impl(grid_size: i32) {
             let d = dist2(&grid_bytes, &pos);
             dist_vec.push((d, j));
         }
-        dist_vec.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
+        dist_vec.sort_by(|a, b| a.cmp(&b));
 
         // Store negative index in kmap to indicate start offset in the neighbours vector.
         kmap[i] = -((nbr_counter as i32) + 1);
@@ -493,7 +493,7 @@ fn iq3xs_init_impl(grid_size: i32) {
         let mut n = 0;
         let mut nhave = 1;
         let mut d_current = dist_vec[0].0;
-        for &(d, j) in dist_vec.iter().step_by(2) {
+        for &(d, j) in dist_vec.iter() {
             if d > d_current {
                 if nhave == nwant {
                     break;
@@ -502,7 +502,7 @@ fn iq3xs_init_impl(grid_size: i32) {
                 nhave += 1;
             }
             // Store the grid index as u16.
-            neighbours.push(j as u16 + 1);
+            neighbours.push(j as u16);
             nbr_counter += 1;
             n += 1;
         }
@@ -702,7 +702,7 @@ pub unsafe fn quantize_row_iq3_xxs_impl(
                     if grid_index < 0 {
                         is_on_grid_aux[k] = false;
                         let neighbours =
-                            kneighbors_q3xs.offset(-(*kmap_q3xs.add(u as usize)) as isize - 1);
+                            kneighbors_q3xs.offset(-(*kmap_q3xs.add(u as usize) + 1) as isize);
                         grid_index = iq3_find_best_neighbour(
                             neighbours,
                             kgrid_q3xs,
@@ -753,7 +753,7 @@ pub unsafe fn quantize_row_iq3_xxs_impl(
                     let mut grid_index = *kmap_q3xs.add(u as usize);
                     if grid_index < 0 {
                         let neighbours =
-                            kneighbors_q3xs.offset(-(*kmap_q3xs.add(u as usize)) as isize - 1);
+                            kneighbors_q3xs.offset(-(*kmap_q3xs.add(u as usize) + 1) as isize);
                         grid_index = iq3_find_best_neighbour(
                             neighbours,
                             kgrid_q3xs,

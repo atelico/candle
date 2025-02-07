@@ -421,9 +421,9 @@ impl GgmlType for BlockIQ3xxs {
                         // Get pointers to grid1 and grid2.
                         // qs[2*l+0] and qs[2*l+1] are used as offsets into IQ3XXS_GRID.
                         let idx1 = *qs.add((2 * l + 0) as usize) as usize;
-                        let grid1 = IQ3XXS_GRID.as_ptr().add(idx1);
+                        let grid1 = IQ3XXS_GRID.as_ptr().add(idx1) as *const u8;
                         let idx2 = *qs.add((2 * l + 1) as usize) as usize;
-                        let grid2 = IQ3XXS_GRID.as_ptr().add(idx2);
+                        let grid2 = IQ3XXS_GRID.as_ptr().add(idx2) as *const u8;
 
                         // For each of 4 values in grid1 and grid2.
                         for j in 0..4 {
@@ -452,8 +452,8 @@ impl GgmlType for BlockIQ3xxs {
 
     fn from_float(xs: &[f32], ys: &mut [Self]) -> Result<()> {
         let k = xs.len();
-        if k % QK4_NL != 0 {
-            bail!("Input length must be multiple of QK4_NL = {}", QK4_NL);
+        if k % QK_K != 0 {
+            bail!("Input length must be multiple of QK_K = {}", QK_K);
         }
 
         unsafe { quantize_iq3_xxs(xs, ys, 1, k, None)? };
@@ -468,8 +468,8 @@ impl GgmlType for BlockIQ3xxs {
         n_per_row: usize,
     ) -> Result<()> {
         let k = xs.len();
-        if k % QK4_NL != 0 {
-            bail!("Input length must be multiple of QK4_NL = {}", QK4_NL);
+        if k % QK_K != 0 {
+            bail!("Input length must be multiple of QK_K = {}", QK_K);
         }
         let nrow = xs.len() / n_per_row;
 

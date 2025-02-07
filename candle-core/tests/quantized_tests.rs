@@ -1029,6 +1029,7 @@ fn quantize_iq3_xxs(device: &Device) -> Result<()> {
     let quant = quantized::QTensor::quantize(&src, dtype)?;
     let dst = quant.dequantize(device)?;
     let dst_f16 = quant.dequantize_f16(device)?;
+    dbg!(&src.mean_all()?);
     dbg!(&dst.mean_all()?);
     let diff = (dst.to_dtype(DType::F16)? - dst_f16)?
         .to_dtype(DType::F32)?
