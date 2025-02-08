@@ -733,7 +733,7 @@ impl GgmlType for BlockF8Q8 {
         let nb = k / QK8_0;
 
         for i in 0..nb {
-            let d = xs[i].d.to_f32();
+            let d = xs[i].dq_d();
 
             for j in 0..QK8_0 {
                 ys[i * QK8_0 + j] = xs[i].qs[j] as f32 * d;
