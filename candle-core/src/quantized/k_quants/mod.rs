@@ -818,7 +818,7 @@ impl GgmlType for BlockF8Q8 {
         ys_1: &[Self::VecDotType],
     ) -> Result<[f32; 4]> {
         #[cfg(target_feature = "neon")]
-        return super::neon::i8mm_q8_0_q8_0(n, xs_0, xs_1, ys_0, ys_1);
+        return super::neon::i8mm_f8q8_q8_0(n, xs_0, xs_1, ys_0, ys_1);
 
         crate::bail!("Unsupported block type for i8mm");
     }

@@ -269,7 +269,7 @@ pub(crate) fn vec_dot_f8q8_q8_0(n: usize, xs: &[BlockF8Q8], ys: &[BlockQ8_0]) ->
 }
 #[inline(always)]
 #[cfg(feature = "arm-nightly-feat")]
-pub(crate) fn i8mm_q8_0_q8_0(
+pub(crate) fn i8mm_f8q8_q8_0(
     n: usize,
     xs_0: &[BlockF8Q8],
     xs_1: &[BlockF8Q8],
