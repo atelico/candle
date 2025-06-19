@@ -1,4 +1,6 @@
-use crate::{CpuStorage, DType, Device, Result, Shape, Storage, Tensor, D};
+use crate::{
+    backend::BackendStorage, CpuStorage, DType, Device, Result, Shape, Storage, Tensor, D,
+};
 use k_quants::*;
 use std::borrow::Cow;
 
@@ -386,6 +388,7 @@ impl GgmlDType {
 pub trait QuantizedType: Send + Sync {
     fn dtype(&self) -> GgmlDType;
     fn matmul_t(&self, mkn: (usize, usize, usize), lhs: &[f32], dst: &mut [f32]) -> Result<()>;
+    fn matmul_t_f16(&self, mkn: (usize, usize, usize), lhs: &[f16], dst: &mut [f16]) -> Result<()>;
     fn dequantize(&self, elem_count: usize) -> Result<CpuStorage>;
     fn storage_size_in_bytes(&self) -> usize;
     fn as_ptr(&self) -> *const u8;
@@ -405,6 +408,9 @@ pub trait QuantizedType: Send + Sync {
 impl<T: k_quants::GgmlType + Send + Sync> QuantizedType for Vec<T> {
     fn matmul_t(&self, mkn: (usize, usize, usize), lhs: &[f32], dst: &mut [f32]) -> Result<()> {
         k_quants::matmul(mkn, lhs, self.as_slice(), dst)
+    }
+    fn matmul_t_f16(&self, mkn: (usize, usize, usize), lhs: &[f16], dst: &mut [f16]) -> Result<()> {
+        k_quants::matmul_f16(mkn, lhs, self.as_slice(), dst)
     }
 
     fn size(&self) -> usize {
@@ -750,11 +756,33 @@ impl crate::CustomOp1 for QTensor {
             QStorage::Cpu(storage) => storage,
             QStorage::Metal(_) | QStorage::Cuda(_) => crate::bail!("Invalid storage"),
         };
-        let slice = storage.as_slice::<f32>()?;
-        let slice = &slice[layout.start_offset()..layout.start_offset() + src_shape.elem_count()];
-        let mut dst_storage = vec![0f32; dst_shape.elem_count()];
-        self_storage.matmul_t((dst_shape.elem_count() / n, k, n), slice, &mut dst_storage)?;
-        Ok((crate::CpuStorage::F32(dst_storage), dst_shape))
+        match storage.dtype() {
+            DType::F32 => {
+                let slice = storage.as_slice::<f32>()?;
+                let slice =
+                    &slice[layout.start_offset()..layout.start_offset() + src_shape.elem_count()];
+                let mut dst_storage = vec![0f32; dst_shape.elem_count()];
+                self_storage.matmul_t(
+                    (dst_shape.elem_count() / n, k, n),
+                    slice,
+                    &mut dst_storage,
+                )?;
+                Ok((crate::CpuStorage::F32(dst_storage), dst_shape))
+            }
+            DType::F16 => {
+                let slice = storage.as_slice::<f16>()?;
+                let slice =
+                    &slice[layout.start_offset()..layout.start_offset() + src_shape.elem_count()];
+                let mut dst_storage = vec![f16::ZERO; dst_shape.elem_count()];
+                self_storage.matmul_t_f16(
+                    (dst_shape.elem_count() / n, k, n),
+                    slice,
+                    &mut dst_storage,
+                )?;
+                Ok((crate::CpuStorage::F16(dst_storage), dst_shape))
+            }
+            _ => crate::bail!("Expected f32/f16"),
+        }
     }
 
     fn metal_fwd(

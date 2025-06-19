@@ -2313,6 +2313,52 @@ pub fn matmul<T: GgmlType>(
     Ok(())
 }
 
+pub fn matmul_f16<T: GgmlType>(
+    mkn: (usize, usize, usize),
+    lhs: &[f16],
+    rhs_t: &[T],
+    dst: &mut [f16],
+) -> Result<()> {
+    let (m, k, n) = mkn;
+    if m * k != lhs.len() {
+        crate::bail!("unexpected lhs length {} {mkn:?}", lhs.len());
+    }
+
+    let k_in_lhs_blocks = k.div_ceil(T::BLCK_SIZE);
+    let k_in_rhs_blocks = k.div_ceil(T::VecDotType::BLCK_SIZE);
+    // TODO: Do not make this copy if the DotType is f32.
+    // TODO: Pre-allocate this.
+    let mut lhs_b = vec![T::VecDotType::zeros(); m * k_in_lhs_blocks];
+    for row_idx in 0..m {
+        let lhs_b = &mut lhs_b[row_idx * k_in_lhs_blocks..(row_idx + 1) * k_in_lhs_blocks];
+        let lhs = &lhs[row_idx * k..(row_idx + 1) * k];
+        T::VecDotType::from_float(
+            &lhs.into_iter().map(|&x| x.to_f32()).collect::<Vec<_>>(),
+            lhs_b,
+        )?
+    }
+    let lhs_b = lhs_b.as_slice();
+
+    for row_idx in 0..m {
+        let lhs_row = &lhs_b[row_idx * k_in_lhs_blocks..(row_idx + 1) * k_in_lhs_blocks];
+        let dst_row = &mut dst[row_idx * n..(row_idx + 1) * n];
+
+        let result: Result<Vec<_>> = dst_row
+            .into_par_iter()
+            .enumerate()
+            .with_min_len(128)
+            .with_max_len(512)
+            .map(|(col_idx, dst)| {
+                let rhs_col = &rhs_t[col_idx * k_in_rhs_blocks..(col_idx + 1) * k_in_rhs_blocks];
+                T::vec_dot(k, rhs_col, lhs_row).map(|value| *dst = f16::from_f32(value))
+            })
+            .collect();
+
+        result?;
+    }
+    Ok(())
+}
+
 impl GgmlType for f32 {
     const DTYPE: GgmlDType = GgmlDType::F32;
     const BLCK_SIZE: usize = 1;
