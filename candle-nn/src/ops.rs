@@ -1610,6 +1610,7 @@ impl candle::CustomOp3 for Sdpa {
         let k_head = k_l.dim(D::Minus1)?;
         let q_head = q_l.dim(D::Minus1)?;
         let q_seq = q_l.dim(2)?;
+        let k_seq = k_l.dim(2)?;
 
         let mut implementation_supports_use_case = q_head == k_head;
         let supported_head_dim = q_head == 32
@@ -1620,8 +1621,9 @@ impl candle::CustomOp3 for Sdpa {
             || q_head == 128
             || q_head == 256;
 
-        let supports_sdpa_full = supported_head_dim;
-        let supports_sdpa_vector = q_seq == 1 && supported_head_dim;
+        let supports_sdpa_full_mask = !self.mask.is_some() || q_seq <= k_seq;
+        let supports_sdpa_full = q_seq > 8 && supported_head_dim && supports_sdpa_full_mask;
+        let supports_sdpa_vector = q_seq <= 8 && supported_head_dim && q_seq <= k_seq;
 
         implementation_supports_use_case &= supports_sdpa_full || supports_sdpa_vector;
 
@@ -1660,7 +1662,7 @@ impl candle::CustomOp3 for Sdpa {
             // Route to the 2 pass fused attention if the k seqlen is large.
             // https://github.com/ml-explore/mlx/pull/1597
             const TWO_PASS_K_THRESHOLD: usize = 1024;
-            if k_l.dim(2)? >= TWO_PASS_K_THRESHOLD {
+            if k_seq >= TWO_PASS_K_THRESHOLD {
                 let mut intermediate_shape = [
                     &out_dims[0..out_dims.len() - 2],
                     &[candle_metal_kernels::SDPA_2PASS_BLOCKS],
@@ -1757,10 +1759,10 @@ impl candle::CustomOp3 for Sdpa {
                     candle::bail!("Mask type {mask_type:?} must match q type {itype:?}");
                 }
 
-                if mask_l.dims() != [q_l.dim(0)?, q_l.dim(1)?, q_l.dim(2)?, k_l.dim(2)?] {
+                if mask_l.dims() != [q_l.dim(0)?, q_l.dim(1)?, q_l.dim(2)?, k_seq] {
                     candle::bail!(
                         "Mask shape must be {:?} (bs, qheads, qseq, kseq), got {:?}",
-                        [q_l.dim(0)?, q_head, q_l.dim(2)?, k_l.dim(2)?],
+                        [q_l.dim(0)?, q_head, q_l.dim(2)?, k_seq],
                         mask_l.dims()
                     );
                 }

@@ -1892,9 +1892,9 @@ pub fn call_sdpa_full(
         nk: nk as i32,
         nq_aligned: nq_aligned as i32,
         nk_aligned: nk_aligned as i32,
-        ql_rem: (ql - nq_aligned * BQ) as i32,
-        kl_rem: (kl - nk_aligned * bk) as i32,
-        ql_off: (kl - ql) as i32,
+        ql_rem: ql.wrapping_sub(nq_aligned * BQ) as i32,
+        kl_rem: kl.wrapping_sub(nk_aligned * bk) as i32,
+        ql_off: kl.wrapping_sub(ql) as i32,
         q_strides: [
             q_strides[0] as i64,
             q_strides[1] as i64,

@@ -80,12 +80,12 @@ impl Drop for CudaStorageSlice {
 fn set_context_for_slice<T>(slice: &CudaSlice<T>) -> std::result::Result<(), CudaError> {
     // Get the device this slice belongs to
     let device = slice.device();
-    
+
     // Set this device's CUDA context as current
     // The exact method depends on cudarc's API
     device.bind_to_thread()?;
     // OR: cudarc::driver::result::ctx::set_current(device.cu_primary_ctx())?;
-    
+
     Ok(())
 }
 
