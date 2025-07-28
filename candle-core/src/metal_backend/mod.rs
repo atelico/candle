@@ -13,6 +13,13 @@ use std::sync::{Arc, Mutex, PoisonError, RwLock, TryLockError};
 mod device;
 pub use device::{DeviceId, MetalDevice};
 
+// iOS and macOS have different storage modes for shared buffers.
+// due to the GPU/CPU management differences.
+#[cfg(target_os = "ios")]
+const SHARED_BUFFER_STORAGE_MODE: MTLResourceOptions = MTLResourceOptions::StorageModeShared;
+#[cfg(not(target_os = "ios"))]
+const SHARED_BUFFER_STORAGE_MODE: MTLResourceOptions = MTLResourceOptions::StorageModeManaged;
+
 pub fn buffer_o<'a>(buffer: &'a Buffer, l: &Layout, dtype: DType) -> BufferOffset<'a> {
     BufferOffset {
         buffer,
@@ -2064,7 +2071,7 @@ impl BackendDevice for MetalDevice {
         let seed = Arc::new(Mutex::new(device.new_buffer_with_data(
             [299792458].as_ptr() as *const c_void,
             4,
-            MTLResourceOptions::StorageModeManaged,
+            SHARED_BUFFER_STORAGE_MODE,
         )));
         let commands = device::Commands::new(command_queue)?;
         Ok(Self {
