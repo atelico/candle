@@ -112,6 +112,9 @@ fn run_unary_bench<T: Clone>(
     strided: [unary::strided::Kernel; 7],
 ) {
     let command_queue = device.new_command_queue();
+    #[cfg(target_os = "ios")]
+    let options = MTLResourceOptions::StorageModeShared;
+    #[cfg(not(target_os = "ios"))]
     let options = MTLResourceOptions::StorageModeManaged;
 
     let iterations = 10000;

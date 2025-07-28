@@ -94,6 +94,9 @@ fn run_binary_bench<T: Clone>(
     strided: [binary::strided::Kernel; 4],
 ) {
     let command_queue = device.new_command_queue();
+    #[cfg(target_os = "ios")]
+    let options = MTLResourceOptions::StorageModeShared;
+    #[cfg(not(target_os = "ios"))]
     let options = MTLResourceOptions::StorageModeManaged;
 
     let iterations = 1000;

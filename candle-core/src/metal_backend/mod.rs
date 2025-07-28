@@ -11,14 +11,7 @@ use std::ffi::c_void;
 use std::sync::{Arc, Mutex, PoisonError, RwLock, TryLockError};
 
 mod device;
-pub use device::{DeviceId, MetalDevice};
-
-// iOS and macOS have different storage modes for shared buffers.
-// due to the GPU/CPU management differences.
-#[cfg(target_os = "ios")]
-const SHARED_BUFFER_STORAGE_MODE: MTLResourceOptions = MTLResourceOptions::StorageModeShared;
-#[cfg(not(target_os = "ios"))]
-const SHARED_BUFFER_STORAGE_MODE: MTLResourceOptions = MTLResourceOptions::StorageModeManaged;
+pub use device::{DeviceId, MetalDevice, SHARED_BUFFER_STORAGE_MODE};
 
 pub fn buffer_o<'a>(buffer: &'a Buffer, l: &Layout, dtype: DType) -> BufferOffset<'a> {
     BufferOffset {
