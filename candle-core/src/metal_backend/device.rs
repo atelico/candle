@@ -323,7 +323,6 @@ impl MetalDevice {
         }
 
         let size = buf_size(size);
-        println!("Allocating new buffer of size {size} with option {option:?}");
         let subbuffers = buffers.entry((size, option)).or_insert(vec![]);
 
         let new_buffer = self.device.new_buffer(size as NSUInteger, option);
