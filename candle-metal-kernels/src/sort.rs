@@ -92,11 +92,11 @@ pub fn multi_block_sort(
                 &src,
                 &mut dev_vals_0,
                 &mut dev_idxs_0,
-                /* size_sorted_axis */ ncols as i32,
-                /* stride_sorted_axis */ 1i32,
-                /* nc_dim */ 1i32,
-                /* nc_shape */ nrows as i32,
-                /* nc_str */ ncols as i32
+                /* size_sorted_axis */ ncols as i64,
+                /* stride_sorted_axis */ 1i64,
+                /* nc_dim */ 1i64,
+                /* nc_shape */ nrows as i64,
+                /* nc_str */ ncols as i64
             )
         );
         let thread_group_count = MTLSize {
@@ -243,11 +243,11 @@ pub fn block_sort(
         (
             &src,
             dst,
-            ncols as i32,
-            1i32,
-            1i32,
-            ncols as i32,
-            ncols as i32
+            ncols as i64,
+            1i64,
+            1i64,
+            ncols as i64,
+            ncols as i64
         )
     );
     let thread_group_count = MTLSize {
