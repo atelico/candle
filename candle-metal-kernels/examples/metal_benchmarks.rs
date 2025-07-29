@@ -14,9 +14,9 @@ fn run_gemm(f32: bool, n: usize) -> Result<()> {
     let kernels = candle_metal_kernels::Kernels::new();
     let command_queue = device.new_command_queue();
     #[cfg(target_os = "ios")]
-    let options = MTLResourceOptions::StorageModeShared;
+    let options = metal::MTLResourceOptions::StorageModeShared;
     #[cfg(not(target_os = "ios"))]
-    let options = MTLResourceOptions::StorageModeManaged;
+    let options = metal::MTLResourceOptions::StorageModeManaged;
 
     let (lhs, rhs) = if f32 {
         let lhs: Vec<f32> = (0..b * m * k).map(|f| f as f32).collect();

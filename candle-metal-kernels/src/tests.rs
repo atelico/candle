@@ -72,7 +72,10 @@ fn run_binary<T: Clone>(x: &[T], y: &[T], name: binary::contiguous::Kernel) -> V
     let kernels = Kernels::new();
     let command_queue = device.new_command_queue();
     let command_buffer = command_queue.new_command_buffer();
-    let options = SHARED_BUFFER_STORAGE_MODE;
+    #[cfg(target_os = "ios")]
+    let options = MTLResourceOptions::StorageModeShared;
+    #[cfg(not(target_os = "ios"))]
+    let options = MTLResourceOptions::StorageModeManaged;
     let left = new_buffer(&device, x);
     let right = new_buffer(&device, y);
     let output = device.new_buffer(std::mem::size_of_val(x) as u64, options);
@@ -314,7 +317,10 @@ fn run_cast<T: Clone, U: Clone>(v: &[T], name: &'static str) -> Vec<U> {
     let command_queue = device.new_command_queue();
     let command_buffer = command_queue.new_command_buffer();
     let input = new_buffer(&device, v);
-    let options = SHARED_BUFFER_STORAGE_MODE;
+    #[cfg(target_os = "ios")]
+    let options = MTLResourceOptions::StorageModeShared;
+    #[cfg(not(target_os = "ios"))]
+    let options = MTLResourceOptions::StorageModeManaged;
     let size = (v.len() * std::mem::size_of::<U>()) as u64;
     let output = device.new_buffer(size, options);
 
@@ -877,7 +883,10 @@ fn run_reduce<T, U: Clone>(
     let command_buffer = command_queue.new_command_buffer();
     let input = new_buffer(&device, v);
 
-    let options = SHARED_BUFFER_STORAGE_MODE;
+    #[cfg(target_os = "ios")]
+    let options = MTLResourceOptions::StorageModeShared;
+    #[cfg(not(target_os = "ios"))]
+    let options = MTLResourceOptions::StorageModeManaged;
     let output = device.new_buffer((out_length * core::mem::size_of::<U>()) as u64, options);
     let shape = vec![in_length];
     match call_reduce_contiguous(
@@ -1191,7 +1200,10 @@ fn run_where_cond<I: Clone, T: Clone>(
     let kernels = Kernels::new();
     let command_queue = device.new_command_queue();
     let command_buffer = command_queue.new_command_buffer();
-    let options = SHARED_BUFFER_STORAGE_MODE;
+    #[cfg(target_os = "ios")]
+    let options = MTLResourceOptions::StorageModeShared;
+    #[cfg(not(target_os = "ios"))]
+    let options = MTLResourceOptions::StorageModeManaged;
 
     let length = cond.len();
     let cond = device.new_buffer_with_data(
@@ -1302,7 +1314,10 @@ fn run_mlx_gemm<T: Clone>(
     let kernels = Kernels::new();
     let command_queue = device.new_command_queue();
     let command_buffer = command_queue.new_command_buffer();
-    let options = SHARED_BUFFER_STORAGE_MODE;
+    #[cfg(target_os = "ios")]
+    let options = MTLResourceOptions::StorageModeShared;
+    #[cfg(not(target_os = "ios"))]
+    let options = MTLResourceOptions::StorageModeManaged;
 
     let lhs = device.new_buffer_with_data(
         lhs.as_ptr() as *const core::ffi::c_void,
@@ -1447,7 +1462,10 @@ fn run_random<T: Clone>(name: &'static str, seed: u32, length: usize, a: f32, b:
     let command_queue = device.new_command_queue();
     let command_buffer = command_queue.new_command_buffer();
 
-    let options = SHARED_BUFFER_STORAGE_MODE;
+    #[cfg(target_os = "ios")]
+    let options = MTLResourceOptions::StorageModeShared;
+    #[cfg(not(target_os = "ios"))]
+    let options = MTLResourceOptions::StorageModeManaged;
     let output = device.new_buffer((length * core::mem::size_of::<T>()) as NSUInteger, options);
 
     let seed = device.new_buffer_with_data(
@@ -1573,7 +1591,10 @@ fn run_scatter_add<T: Clone, I: Clone + std::fmt::Debug>(
     let kernels = Kernels::new();
     let command_queue = device.new_command_queue();
     let command_buffer = command_queue.new_command_buffer();
-    let options = SHARED_BUFFER_STORAGE_MODE;
+    #[cfg(target_os = "ios")]
+    let options = MTLResourceOptions::StorageModeShared;
+    #[cfg(not(target_os = "ios"))]
+    let options = MTLResourceOptions::StorageModeManaged;
     let input_buffer = new_buffer(&device, input);
     let ids_buffer = new_buffer(&device, ids);
     let output = device.new_buffer(std::mem::size_of_val(input) as u64, options);
