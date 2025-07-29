@@ -525,6 +525,45 @@ fn cast_i64() {
     assert_eq!(results, v_u8);
 }
 
+// This test specifically targets the buffer size mismatch for scalar casting.
+#[test]
+fn cast_scalar() {
+    let device = device();
+    let kernels = Kernels::new();
+    let command_queue = device.new_command_queue();
+    let command_buffer = command_queue.new_command_buffer();
+
+    let input_data = &[1.0f32];
+    let input_buffer = new_buffer(&device, input_data);
+    let input = BufferOffset::zero_offset(&input_buffer);
+
+    #[cfg(target_os = "ios")]
+    let options = MTLResourceOptions::StorageModeShared;
+    #[cfg(not(target_os = "ios"))]
+    let options = MTLResourceOptions::StorageModeManaged;
+
+    // This is the BUG: The output buffer is allocated with the size of the
+    // INPUT dtype (f32 = 4 bytes) instead of the OUTPUT dtype (bf16 = 2 bytes).
+    // The error message shows length=1, but it should be 2. Let's replicate
+    // the likely buggy allocation size calculation to trigger the validation error.
+    let buggy_size = (1 * std::mem::size_of::<f32>()) as u64; // Incorrectly using f32 size
+    let output_buffer = device.new_buffer(buggy_size, options);
+
+    // This call should fail the Metal validation.
+    call_cast_contiguous(
+        &device,
+        command_buffer,
+        &kernels,
+        "cast_f32_bf16",
+        1, // el_count = 1
+        input,
+        &output_buffer,
+    )
+    .unwrap();
+    command_buffer.commit();
+    command_buffer.wait_until_completed();
+}
+
 fn run_affine<T: Clone>(v: &[T], mul: f64, add: f64) -> Vec<T> {
     let device = device();
     let kernels = Kernels::new();

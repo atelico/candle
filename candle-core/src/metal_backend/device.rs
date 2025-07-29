@@ -323,6 +323,7 @@ impl MetalDevice {
         }
 
         let size = buf_size(size);
+        println!("Allocating new buffer of size {size} with option {option:?}");
         let subbuffers = buffers.entry((size, option)).or_insert(vec![]);
 
         let new_buffer = self.device.new_buffer(size as NSUInteger, option);
@@ -354,7 +355,8 @@ impl MetalDevice {
 }
 
 fn buf_size(size: NSUInteger) -> NSUInteger {
-    size.saturating_sub(1).next_power_of_two() as NSUInteger
+    // size.saturating_sub(1).next_power_of_two() as NSUInteger
+    size.next_power_of_two() as NSUInteger
 }
 
 fn find_available_buffer(
