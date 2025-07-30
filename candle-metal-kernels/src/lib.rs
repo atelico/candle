@@ -625,6 +625,11 @@ pub fn call_binary_strided(
     let (thread_group_count, thread_group_size) = linear_split(&pipeline, width);
 
     encoder.set_compute_pipeline_state(&pipeline);
+
+    let dummy = &[0usize];
+    let shape = if num_dims == 0 { dummy } else { shape };
+    let left_strides = if num_dims == 0 { dummy } else { left_strides };
+    let right_strides = if num_dims == 0 { dummy } else { right_strides };
     set_params!(
         encoder,
         (
