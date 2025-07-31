@@ -203,6 +203,37 @@ impl AsRef<metal::ComputeCommandEncoderRef> for WrappedEncoder<'_> {
     }
 }
 
+#[cfg(any(target_os = "ios", target_os = "macos"))]
+pub struct AutoreleasePoolGuard {
+    pool: *mut c_void,
+}
+
+#[cfg(any(target_os = "ios", target_os = "macos"))]
+impl Drop for AutoreleasePoolGuard {
+    fn drop(&mut self) {
+        unsafe {
+            objc_autoreleasePoolPop(self.pool);
+        }
+    }
+}
+
+#[cfg(any(target_os = "ios", target_os = "macos"))]
+pub fn autoreleasepool() -> AutoreleasePoolGuard {
+    unsafe {
+        AutoreleasePoolGuard {
+            pool: objc_autoreleasePoolPush(),
+        }
+    }
+}
+
+#[cfg(not(any(target_os = "ios", target_os = "macos")))]
+pub struct AutoreleasePoolGuard;
+
+#[cfg(not(any(target_os = "ios", target_os = "macos")))]
+pub fn autoreleasepool() -> AutoreleasePoolGuard {
+    AutoreleasePoolGuard
+}
+
 impl EncoderProvider for &metal::CommandBuffer {
     type Encoder<'a>
         = WrappedEncoder<'a>
