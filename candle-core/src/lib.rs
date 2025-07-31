@@ -69,6 +69,7 @@ mod indexer;
 pub mod layout;
 #[cfg(feature = "metal")]
 pub mod metal_backend;
+
 #[cfg(feature = "mkl")]
 mod mkl;
 pub mod npy;
@@ -87,6 +88,9 @@ mod tensor_cat;
 pub mod test_utils;
 pub mod utils;
 mod variable;
+// regardless of features, we have autoreleasepool,
+// dummy implementation does nothing
+pub use utils::autoreleasepool;
 
 #[cfg(feature = "cudnn")]
 pub use cuda_backend::cudnn;

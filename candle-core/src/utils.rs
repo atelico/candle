@@ -1,6 +1,41 @@
 //! Useful functions for checking features.
 use std::str::FromStr;
 
+// ---------- iOS / macOS autorelease‑pool glue ----------
+#[cfg(feature = "metal")]
+use objc::runtime::{objc_autoreleasePoolPop, objc_autoreleasePoolPush};
+// -------------------------------------------------------
+#[cfg(feature = "metal")]
+pub struct AutoreleasePoolGuard {
+    pool: *mut c_void,
+}
+
+#[cfg(feature = "metal")]
+impl Drop for AutoreleasePoolGuard {
+    fn drop(&mut self) {
+        unsafe {
+            objc_autoreleasePoolPop(self.pool);
+        }
+    }
+}
+
+#[cfg(feature = "metal")]
+pub fn autoreleasepool() -> AutoreleasePoolGuard {
+    unsafe {
+        AutoreleasePoolGuard {
+            pool: objc_autoreleasePoolPush(),
+        }
+    }
+}
+
+#[cfg(not(feature = "metal"))]
+pub struct AutoreleasePoolGuard;
+
+#[cfg(not(feature = "metal"))]
+pub fn autoreleasepool() -> AutoreleasePoolGuard {
+    AutoreleasePoolGuard
+}
+
 pub fn get_num_threads() -> usize {
     // Respond to the same environment variable as rayon.
     match std::env::var("RAYON_NUM_THREADS")
