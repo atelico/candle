@@ -1,6 +1,11 @@
 use metal::{Buffer, ComputeCommandEncoderRef, ComputePipelineState, MTLSize};
 use std::ffi::c_void;
 
+// ---------- iOS / macOS autorelease‑pool glue ----------
+#[cfg(any(target_os = "ios", target_os = "macos"))]
+use objc::runtime::{objc_autoreleasePoolPop, objc_autoreleasePoolPush};
+// -------------------------------------------------------
+
 /// Most kernels apply similarly across the tensors
 /// This creates a strategy that uses the maximum amount of threads per threadgroup (capped at the
 /// actual total buffer length).
@@ -170,6 +175,9 @@ pub trait EncoderProvider {
 
 pub struct WrappedEncoder<'a> {
     inner: &'a ComputeCommandEncoderRef,
+    // Pool lives exactly as long as the encoder.
+    #[cfg(any(target_os = "ios", target_os = "macos"))]
+    pool_ctx: *mut c_void,
     end_encoding_on_drop: bool,
 }
 
@@ -177,6 +185,14 @@ impl Drop for WrappedEncoder<'_> {
     fn drop(&mut self) {
         if self.end_encoding_on_drop {
             self.inner.end_encoding()
+        }
+        // Drain the autorelease pool *after* end_encoding so that any
+        // temporary Metal objects created inside the encoder are freed now.
+        #[cfg(any(target_os = "ios", target_os = "macos"))]
+        unsafe {
+            if !self.pool_ctx.is_null() {
+                objc_autoreleasePoolPop(self.pool_ctx);
+            }
         }
     }
 }
@@ -193,8 +209,13 @@ impl EncoderProvider for &metal::CommandBuffer {
     where
         Self: 'a;
     fn encoder(&self) -> Self::Encoder<'_> {
+        #[cfg(any(target_os = "ios", target_os = "macos"))]
+        let pool = unsafe { objc_autoreleasePoolPush() };
+
         WrappedEncoder {
             inner: self.new_compute_command_encoder(),
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            pool_ctx: pool,
             end_encoding_on_drop: true,
         }
     }
@@ -206,8 +227,13 @@ impl EncoderProvider for &metal::CommandBufferRef {
     where
         Self: 'a;
     fn encoder(&self) -> Self::Encoder<'_> {
+        #[cfg(any(target_os = "ios", target_os = "macos"))]
+        let pool = unsafe { objc_autoreleasePoolPush() };
+
         WrappedEncoder {
             inner: self.new_compute_command_encoder(),
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            pool_ctx: pool,
             end_encoding_on_drop: true,
         }
     }
@@ -219,8 +245,13 @@ impl EncoderProvider for &ComputeCommandEncoderRef {
     where
         Self: 'a;
     fn encoder(&self) -> Self::Encoder<'_> {
+        // We did not create a new encoder, so we *must not* push another pool
+        // (would double‑pop). Leave context null.
+
         WrappedEncoder {
             inner: self,
+            #[cfg(any(target_os = "ios", target_os = "macos"))]
+            pool_ctx: std::ptr::null_mut(),
             end_encoding_on_drop: false,
         }
     }
