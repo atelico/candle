@@ -3,7 +3,10 @@ use std::str::FromStr;
 
 // ---------- iOS / macOS autorelease‑pool glue ----------
 #[cfg(feature = "metal")]
-use objc::runtime::{objc_autoreleasePoolPop, objc_autoreleasePoolPush};
+use std::ffi::c_void;
+
+#[cfg(feature = "metal")]
+use metal::objc::runtime::{objc_autoreleasePoolPop, objc_autoreleasePoolPush};
 // -------------------------------------------------------
 #[cfg(feature = "metal")]
 pub struct AutoreleasePoolGuard {
