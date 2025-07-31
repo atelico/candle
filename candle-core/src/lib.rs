@@ -177,3 +177,17 @@ impl<M: Module> ModuleT for M {
         self.forward(xs)
     }
 }
+
+/// A convenience macro so you can write:
+/// ```
+/// let result = autorelease_block!({
+///     do_heavy_metal_work()?
+/// });
+/// ```
+#[macro_export]
+macro_rules! autorelease_block {
+    ($body:block) => {{
+        let _pool = $crate::utils::autoreleasepool();
+        $body
+    }};
+}
