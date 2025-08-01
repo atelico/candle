@@ -306,6 +306,9 @@ macro_rules! autorelease_block {
     }};
 }
 
+#[cfg(feature = "metal")]
+static LAST_PRINT_TIME: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 #[macro_export]
 macro_rules! autorelease_block_for_device {
     ($device:expr, $body:block) => {{
@@ -313,12 +316,31 @@ macro_rules! autorelease_block_for_device {
         {
             #[cfg(feature = "metal")]
             if let candle_core::Device::Metal(_) = $device {
-                // print total memory allocated at time of block
-                use candle_core::{get_memory_allocated, Device};
-                println!(
-                    "Memory allocated before block: {} bytes",
-                    get_memory_allocated($device).unwrap_or(0)
-                );
+                use std::sync::atomic::Ordering;
+                use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+                // Get current time in milliseconds
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap_or(Duration::from_secs(0))
+                    .as_millis() as u64;
+
+                // Only print if it's been at least 250ms since the last print
+                let last_time = $crate::LAST_PRINT_TIME.load(Ordering::Relaxed);
+                if now - last_time >= 250 {
+                    // Try to update the last print time using compare_and_exchange
+                    if $crate::LAST_PRINT_TIME
+                        .compare_exchange(last_time, now, Ordering::SeqCst, Ordering::Relaxed)
+                        .is_ok()
+                    {
+                        // We won the race, print memory info
+                        use candle_core::{get_memory_allocated, Device};
+                        println!(
+                            "Memory allocated: {} bytes",
+                            get_memory_allocated($device).unwrap_or(0)
+                        );
+                    }
+                }
             }
         }
         $body
