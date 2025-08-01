@@ -313,11 +313,11 @@ macro_rules! autorelease_block_for_device {
         #[cfg(feature = "metal")]
         if let candle_core::Device::Metal(_) = $device {
             // print total memory allocated at time of block
-            #cfg(feature = "metal")
+            #[cfg(feature = "metal")]
             use candle_core::get_memory_allocated;
-            #cfg(feature = "metal")
+            #[cfg(feature = "metal")]
             use candle_core::Device;
-            #cfg(feature = "metal")
+            #[cfg(feature = "metal")]
             println!(
                 "Memory allocated before block: {} bytes",
                 get_memory_allocated($device).unwrap_or(0)
