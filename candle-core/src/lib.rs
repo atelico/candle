@@ -338,11 +338,18 @@ macro_rules! autorelease_block_for_device {
     ($device:expr, $body:block) => {{
         let _pool = $crate::utils::autoreleasepool();
         if $crate::should_print_memory_info() {
-            println!(
-                "Memory allocated: {} bytes",
-                $crate::get_memory_allocated($device).unwrap_or(0)
-            );
+            let bytes = $crate::get_memory_allocated($device).unwrap_or(0);
+            let megabytes = bytes as f64 / (1024.0 * 1024.0);
+            println!("[candle-core] Memory allocated: {:.2} MB", megabytes);
         }
         $body
     }};
+}
+
+fn example_autorelease_block() {
+    let device = Device::Cpu; // or Device::Metal, etc.
+    autorelease_block_for_device!(&device, {
+        // Heavy Metal work here
+        println!("Doing heavy work in autorelease block");
+    });
 }
