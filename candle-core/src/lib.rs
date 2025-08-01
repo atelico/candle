@@ -319,7 +319,7 @@ pub fn should_print_memory_info() -> bool {
         .as_millis() as u64;
 
     let last_time = LAST_MEMORY_PRINT_TIME.load(Ordering::Relaxed);
-    if now - last_time >= 50 {
+    if now - last_time >= 1000 {
         // Try to update the last print time
         LAST_MEMORY_PRINT_TIME
             .compare_exchange(last_time, now, Ordering::SeqCst, Ordering::Relaxed)
