@@ -310,18 +310,16 @@ macro_rules! autorelease_block {
 macro_rules! autorelease_block_for_device {
     ($device:expr, $body:block) => {{
         let _pool = $crate::utils::autoreleasepool();
-        #[cfg(feature = "metal")]
-        if let candle_core::Device::Metal(_) = $device {
-            // print total memory allocated at time of block
+        {
             #[cfg(feature = "metal")]
-            use candle_core::get_memory_allocated;
-            #[cfg(feature = "metal")]
-            use candle_core::Device;
-            #[cfg(feature = "metal")]
-            println!(
-                "Memory allocated before block: {} bytes",
-                get_memory_allocated($device).unwrap_or(0)
-            );
+            if let candle_core::Device::Metal(_) = $device {
+                // print total memory allocated at time of block
+                use candle_core::{get_memory_allocated, Device};
+                println!(
+                    "Memory allocated before block: {} bytes",
+                    get_memory_allocated($device).unwrap_or(0)
+                );
+            }
         }
         $body
     }};
