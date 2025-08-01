@@ -319,7 +319,7 @@ pub fn should_print_memory_info() -> bool {
         .as_millis() as u64;
 
     let last_time = LAST_MEMORY_PRINT_TIME.load(Ordering::Relaxed);
-    if now - last_time >= 5 {
+    if now - last_time >= 50 {
         // Try to update the last print time
         LAST_MEMORY_PRINT_TIME
             .compare_exchange(last_time, now, Ordering::SeqCst, Ordering::Relaxed)
@@ -338,9 +338,17 @@ macro_rules! autorelease_block_for_device {
     ($device:expr, $body:block) => {{
         let _pool = $crate::utils::autoreleasepool();
         if $crate::should_print_memory_info() {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default();
             let bytes = $crate::get_memory_allocated($device).unwrap_or(0);
             let megabytes = bytes as f64 / (1024.0 * 1024.0);
-            println!("[candle-core] Memory allocated: {:.2} MB", megabytes);
+            println!(
+                "[{}.{:03}] [candle-core] Memory allocated: {:.2} MB",
+                now.as_secs(),
+                now.subsec_millis(),
+                megabytes
+            );
         }
         $body
     }};
