@@ -333,14 +333,12 @@ pub fn should_print_memory_info() -> bool {
 macro_rules! autorelease_block_for_device {
     ($device:expr, $body:block) => {{
         let _pool = $crate::utils::autoreleasepool();
-        {
-            #[cfg(feature = "metal")]
-            if crate::should_print_memory_info() {
-                println!(
-                    "Memory allocated: {} bytes",
-                    get_memory_allocated($device).unwrap_or(0)
-                );
-            }
+        #[cfg(feature = "metal")]
+        if crate::should_print_memory_info() {
+            println!(
+                "Memory allocated: {} bytes",
+                get_memory_allocated($device).unwrap_or(0)
+            );
         }
         $body
     }};
