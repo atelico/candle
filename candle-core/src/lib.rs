@@ -307,7 +307,27 @@ macro_rules! autorelease_block {
 }
 
 #[cfg(feature = "metal")]
-static LAST_PRINT_TIME: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static LAST_MEMORY_PRINT_TIME: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+#[cfg(feature = "metal")]
+pub fn should_print_memory_info() -> bool {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or(Duration::from_secs(0))
+        .as_millis() as u64;
+
+    let last_time = LAST_MEMORY_PRINT_TIME.load(Ordering::Relaxed);
+    if now - last_time >= 250 {
+        // Try to update the last print time
+        LAST_MEMORY_PRINT_TIME
+            .compare_exchange(last_time, now, Ordering::SeqCst, Ordering::Relaxed)
+            .is_ok()
+    } else {
+        false
+    }
+}
 
 #[macro_export]
 macro_rules! autorelease_block_for_device {
@@ -315,32 +335,11 @@ macro_rules! autorelease_block_for_device {
         let _pool = $crate::utils::autoreleasepool();
         {
             #[cfg(feature = "metal")]
-            if let candle_core::Device::Metal(_) = $device {
-                use std::sync::atomic::Ordering;
-                use std::time::{Duration, SystemTime, UNIX_EPOCH};
-
-                // Get current time in milliseconds
-                let now = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap_or(Duration::from_secs(0))
-                    .as_millis() as u64;
-
-                // Only print if it's been at least 250ms since the last print
-                let last_time = $crate::LAST_PRINT_TIME.load(Ordering::Relaxed);
-                if now - last_time >= 250 {
-                    // Try to update the last print time using compare_and_exchange
-                    if $crate::LAST_PRINT_TIME
-                        .compare_exchange(last_time, now, Ordering::SeqCst, Ordering::Relaxed)
-                        .is_ok()
-                    {
-                        // We won the race, print memory info
-                        use candle_core::{get_memory_allocated, Device};
-                        println!(
-                            "Memory allocated: {} bytes",
-                            get_memory_allocated($device).unwrap_or(0)
-                        );
-                    }
-                }
+            if crate::should_print_memory_info() {
+                println!(
+                    "Memory allocated: {} bytes",
+                    get_memory_allocated($device).unwrap_or(0)
+                );
             }
         }
         $body
