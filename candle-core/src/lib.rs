@@ -340,7 +340,7 @@ macro_rules! autorelease_block_for_device {
         if crate::should_print_memory_info() {
             println!(
                 "Memory allocated: {} bytes",
-                get_memory_allocated($device).unwrap_or(0)
+                $crate::get_memory_allocated($device).unwrap_or(0)
             );
         }
         $body
